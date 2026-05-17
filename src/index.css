@@ -1,0 +1,77 @@
+/* ─── 全局样式：羊皮纸古典风格 ────────────────────────────── */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background-color: #faf3e0;
+  color: #333;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 古典标题字体 - LXGW WenKai 楷体 */
+.font-classic,
+[style*="fontFamily: serif"],
+[style*="font-family: serif"] {
+  font-family: 'LXGW WenKai TC', serif;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(139, 69, 19, 0.05);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(26, 35, 126, 0.25);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 35, 126, 0.45);
+}
+
+/* MUI 全局覆盖 - 分层圆角策略 */
+.MuiCard-root {
+  border-radius: 12px !important;
+}
+.MuiMenu-paper,
+.MuiPopover-paper {
+  border-radius: 8px !important;
+}
+.MuiTooltip-tooltip {
+  border-radius: 6px !important;
+}
+.MuiDialog-paper {
+  border-radius: 16px !important;
+}
+
+/* 古典风格卡片阴影 */
+.classic-shadow {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(139, 69, 19, 0.08);
+}
+
+/* 动画过渡 */
+.fade-enter {
+  opacity: 0;
+}
+.fade-enter-active {
+  opacity: 1;
+  transition: opacity 200ms ease-in;
+}

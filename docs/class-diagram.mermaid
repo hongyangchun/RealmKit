@@ -1,0 +1,150 @@
+classDiagram
+    class WorldMeta {
+        +string id
+        +string name
+        +string description
+        +string createdAt
+        +string updatedAt
+    }
+
+    class Faction {
+        +string id
+        +string name
+        +string color
+        +string description
+        +number foundedYear?
+        +number dissolvedYear?
+        +string[] eras
+    }
+
+    class Skill {
+        +string name
+        +string description
+        +string type
+    }
+
+    class Character {
+        +string id
+        +string name
+        +string factionId
+        +string avatar?
+        +number birthYear?
+        +number deathYear?
+        +string title?
+        +Skill[] skills
+        +string[] traits
+        +string bio
+        +string[] relatedEventIds
+    }
+
+    class Relation {
+        +string id
+        +string sourceId
+        +string targetId
+        +string type
+        +string description?
+    }
+
+    class HistoryEvent {
+        +string id
+        +string title
+        +number year
+        +number month?
+        +string[] factionIds
+        +string[] characterIds
+        +string location?
+        +string description
+        +string[] tags
+    }
+
+    class MapPin {
+        +string id
+        +number x
+        +number y
+        +string label
+        +string type
+        +string factionId?
+        +string[] eventIds
+        +string era?
+    }
+
+    class WorldData {
+        +WorldMeta meta
+        +Faction[] factions
+        +Character[] characters
+        +Relation[] relations
+        +HistoryEvent[] events
+        +MapPin[] mapPins
+        +string mapImage?
+        +string[] eras
+    }
+
+    class ConflictResult {
+        +string type
+        +string characterId
+        +string[] eventIds
+        +string message
+        +string severity
+    }
+
+    class SearchResult {
+        +string type
+        +string id
+        +string label
+        +string highlight
+        +string path
+    }
+
+    class StorageAdapter {
+        +load() WorldData
+        +save(data: WorldData) void
+        +clear() void
+    }
+
+    class WorldStore {
+        +WorldData data
+        +boolean isDirty
+        +ConflictResult[] conflicts
+        +addCharacter(c: Character) void
+        +updateCharacter(id: string, patch: Partial~Character~) void
+        +deleteCharacter(id: string) void
+        +addEvent(e: HistoryEvent) void
+        +updateEvent(id: string, patch: Partial~HistoryEvent~) void
+        +deleteEvent(id: string) void
+        +addMapPin(p: MapPin) void
+        +updateMapPin(id: string, patch: Partial~MapPin~) void
+        +deleteMapPin(id: string) void
+        +addRelation(r: Relation) void
+        +deleteRelation(id: string) void
+        +addFaction(f: Faction) void
+        +updateFaction(id: string, patch: Partial~Faction~) void
+        +deleteFaction(id: string) void
+        +importData(data: WorldData) void
+        +exportData() WorldData
+        +updateMeta(patch: Partial~WorldMeta~) void
+    }
+
+    class ConflictDetector {
+        +detect(data: WorldData) ConflictResult[]
+        +detectForCharacter(char: Character, events: HistoryEvent[]) ConflictResult[]
+        -checkDeathViolation(char: Character, events: HistoryEvent[]) ConflictResult[]
+        -checkLocationConflict(char: Character, events: HistoryEvent[]) ConflictResult[]
+    }
+
+    class ImportExportService {
+        +exportToJson(data: WorldData) void
+        +importFromJson(file: File) Promise~WorldData~
+        +validateSchema(data: unknown) boolean
+    }
+
+    WorldData "1" *-- "1" WorldMeta
+    WorldData "1" *-- "*" Faction
+    WorldData "1" *-- "*" Character
+    WorldData "1" *-- "*" Relation
+    WorldData "1" *-- "*" HistoryEvent
+    WorldData "1" *-- "*" MapPin
+    Character "1" *-- "*" Skill
+    WorldStore ..> WorldData : manages
+    WorldStore ..> StorageAdapter : persists via
+    ConflictDetector ..> WorldData : analyzes
+    ImportExportService ..> WorldData : serializes

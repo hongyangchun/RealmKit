@@ -1,0 +1,60 @@
+sequenceDiagram
+    participant User as 用户
+    participant App as App.tsx
+    participant Store as WorldStore (Zustand)
+    participant Storage as StorageAdapter
+    participant Detector as ConflictDetector
+    participant IE as ImportExportService
+
+    %% 应用初始化
+    App->>Storage: load()
+    Storage-->>App: WorldData (from localStorage)
+    App->>Store: importData(WorldData)
+
+    %% 创建人物
+    User->>CharacterPage: 点击「新建人物」
+    CharacterPage->>CharacterForm: 打开表单
+    User->>CharacterForm: 填写姓名/技能/头像
+    CharacterForm->>Store: addCharacter(character)
+    Store->>Storage: save(worldData)
+    Store->>Detector: detect(worldData)
+    Detector-->>Store: ConflictResult[]
+    Store-->>CharacterPage: 更新渲染
+
+    %% 新增历史事件
+    User->>TimelinePage: 点击「+ 新增事件」
+    TimelinePage->>EventForm: 打开表单
+    User->>EventForm: 填写年份/标题/关联人物
+    EventForm->>Store: addEvent(event)
+    Store->>Storage: save(worldData)
+    Store->>Detector: detect(worldData)
+    Detector-->>Store: ConflictResult[]（若有冲突则高亮节点）
+    Store-->>TimelinePage: 更新时间轴渲染
+
+    %% 地图图钉
+    User->>MapPage: 点击地图 + 拖拽添加图钉
+    MapCanvas->>PinForm: 计算 x/y 百分比坐标，打开表单
+    User->>PinForm: 填写标签/类型/所属势力
+    PinForm->>Store: addMapPin(pin)
+    Store->>Storage: save(worldData)
+    Store-->>MapCanvas: 更新图钉渲染
+
+    %% 导出 JSON
+    User->>TopBar: 点击「导出」
+    TopBar->>IE: exportToJson(store.exportData())
+    IE->>User: 触发浏览器文件下载（zzworld_export.json）
+
+    %% 导入 JSON
+    User->>TopBar: 点击「导入」，选择文件
+    TopBar->>IE: importFromJson(file)
+    IE->>IE: validateSchema(data)
+    IE-->>Store: importData(WorldData)
+    Store->>Storage: save(worldData)
+    Store-->>App: 全量刷新渲染
+
+    %% 全局搜索
+    User->>SearchBar: 输入搜索词
+    SearchBar->>useSearch: query(text)
+    useSearch->>Store: 获取 characters/events/mapPins
+    useSearch-->>SearchBar: SearchResult[]
+    SearchBar->>User: 显示下拉结果，点击跳转对应页面

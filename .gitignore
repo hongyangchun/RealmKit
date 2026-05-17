@@ -1,0 +1,20 @@
+node_modules
+dist
+.DS_Store
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build
+*.tsbuildinfo
+
+# Test
+test-results/
+coverage/
+
+# OS
+Thumbs.db
