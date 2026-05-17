@@ -69,6 +69,9 @@ const CharacterPage: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [filterFaction, setFilterFaction] = useState<string>('all');
 
+  // ── 网络图可见节点计数 ──
+  const [graphVisibleCount, setGraphVisibleCount] = useState(characters.length);
+
   // ── 角色表单 ──
   const [showForm, setShowForm] = useState(false);
   const [editingChar, setEditingChar] = useState<Character | null>(null);
@@ -347,7 +350,7 @@ const CharacterPage: React.FC = () => {
 
         {/* Character count */}
         <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-          {filteredCharacters.length} 位人物
+          {viewMode === 'graph' ? graphVisibleCount : filteredCharacters.length} 位人物
         </Typography>
 
         {/* New character button */}
@@ -425,6 +428,8 @@ const CharacterPage: React.FC = () => {
             <RelationGraph
               onNodeSelect={setSelectedCharId}
               selectedNodeId={selectedCharId}
+              searchText={searchText}
+              onVisibleCountChange={setGraphVisibleCount}
             />
           ) : filteredCharacters.length > 0 ? (
             <Box sx={{ p: 2, overflow: 'auto', height: '100%' }}>

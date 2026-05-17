@@ -2,7 +2,7 @@
  * RelationGraph - 力导向关系网络图
  * 使用 react-force-graph-2d 渲染
  */
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import ForceGraph2D from 'react-force-graph-2d';
 import type { GraphData } from 'force-graph';
@@ -12,6 +12,10 @@ import GraphControls from './GraphControls';
 interface RelationGraphProps {
   onNodeSelect?: (nodeId: string | null) => void;
   selectedNodeId?: string | null;
+  /** 搜索文本，用于按名字/标题过滤节点 */
+  searchText?: string;
+  /** 过滤后节点数量回调，用于宿主页面显示计数 */
+  onVisibleCountChange?: (count: number) => void;
 }
 
 interface GraphNodeData {
@@ -42,6 +46,8 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
   const factions = useWorldStore((s) => s.data.factions);
   const relations = useWorldStore((s) => s.data.relations);
 
+  const { searchText = '', onVisibleCountChange } = props;
+
   const isControlled = 'onNodeSelect' in props && props.onNodeSelect !== undefined;
   const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
   const selectedNodeId = isControlled ? (props.selectedNodeId ?? null) : internalSelectedId;
@@ -49,6 +55,24 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
   const [selectedFactions, setSelectedFactions] = useState<string[]>(factions.map((f) => f.id));
   const [selectedRelationTypes, setSelectedRelationTypes] = useState<string[]>([]);
   const [hoverNode, setHoverNode] = useState<ForceGraphNode | null>(null);
+
+  // Sync selectedFactions when factions data changes (add/delete)
+  useEffect(() => {
+    setSelectedFactions((prev) => {
+      const currentIds = new Set(factions.map((f) => f.id));
+      // Remove IDs that no longer exist, add new ones
+      const filtered = prev.filter((id) => currentIds.has(id));
+      const filteredSet = new Set(filtered);
+      for (const id of currentIds) {
+        if (!filteredSet.has(id)) filtered.push(id);
+      }
+      return filtered;
+    });
+  }, [factions]);
+
+  // Ref for onVisibleCountChange to avoid unnecessary re-renders
+  const onVisibleCountChangeRef = useRef(onVisibleCountChange);
+  onVisibleCountChangeRef.current = onVisibleCountChange;
 
   const handleNodeSelect = useCallback((nodeId: string | null) => {
     if (isControlled && props.onNodeSelect) {
@@ -60,6 +84,8 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
 
   // Build graph data with filtering
   const graphData: GraphData = useMemo(() => {
+    const lowerSearch = searchText.toLowerCase();
+
     // Filter characters by faction (if any selected)
     const visibleCharIds = new Set(
       selectedFactions.length > 0
@@ -74,6 +100,18 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
     for (const char of characters) {
       if (!visibleCharIds.has(char.id)) continue;
 
+      // Search filter: match name, bio, title, traits, skills
+      if (lowerSearch) {
+        const haystack = [
+          char.name,
+          char.bio,
+          char.title ?? '',
+          ...char.traits,
+          ...(char.skills?.map((s: { name: string }) => s.name) ?? []),
+        ].join(' ').toLowerCase();
+        if (!haystack.includes(lowerSearch)) continue;
+      }
+
       const faction = factionMap.get(char.factionId);
       const node: ForceGraphNode = {
         id: char.id,
@@ -86,10 +124,11 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
     }
 
     // Build links (filter by relation types if selected)
+    const nodeIdSet = new Set(nodes.map((n) => n.id));
     let links: GraphLink[] = relations
       .filter((r) =>
-        visibleCharIds.has(r.sourceId) &&
-        visibleCharIds.has(r.targetId) &&
+        nodeIdSet.has(r.sourceId) &&
+        nodeIdSet.has(r.targetId) &&
         (selectedRelationTypes.length === 0 || selectedRelationTypes.includes(r.type))
       )
       .map((r) => ({
@@ -100,7 +139,14 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
       }));
 
     return { nodes, links };
-  }, [characters, factions, relations, selectedFactions, selectedRelationTypes]);
+  }, [characters, factions, relations, selectedFactions, selectedRelationTypes, searchText]);
+
+  // Report visible count to parent
+  const graphDataRef = useRef(graphData);
+  graphDataRef.current = graphData;
+  useEffect(() => {
+    onVisibleCountChangeRef.current?.(graphDataRef.current.nodes.length);
+  }, [graphData]);
 
   const handleFactionToggle = useCallback(
     (factionId: string) => {
@@ -195,7 +241,6 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
         height={undefined}
         nodeId="id"
         nodeLabel="name"
-        nodeAutoColorBy="factionColor"
         nodeCanvasObject={(node, ctx, globalScale) => {
           const gNode = node as unknown as ForceGraphNode;
           const label = gNode.name;
