@@ -550,7 +550,7 @@ export class WorldSeedGenerator {
         relations.push({
           sourceId: `char_${mentorIdx}`,
           targetId: `char_${studentIdx}`,
-          type: bank.relationTypes.find((r) => r.type === '师徒' || r.type === '导师')?.type ?? '师徒',
+          type: (bank.relationTypes.find((r) => r.type === '师徒' || r.type === '导师')?.type ?? '师徒') as Relation['type'],
           description: `${characters[mentorIdx].name}是${characters[studentIdx].name}的导师`,
         });
 
@@ -564,7 +564,7 @@ export class WorldSeedGenerator {
             relations.push({
               sourceId: `char_${pair[0]}`,
               targetId: `char_${pair[1]}`,
-              type: friendType.type,
+              type: friendType.type as Relation['type'],
               description: `${characters[pair[0]].name}与${characters[pair[1]].name}是最亲密的伙伴`,
             });
           }
@@ -591,7 +591,7 @@ export class WorldSeedGenerator {
             relations.push({
               sourceId: `char_${charA}`,
               targetId: `char_${charB}`,
-              type: enemyType.type,
+              type: enemyType.type as Relation['type'],
               description: `${characters[charA].name}与${characters[charB].name}势不两立`,
             });
           }
@@ -610,7 +610,7 @@ export class WorldSeedGenerator {
           relations.push({
             sourceId: `char_${pair[0]}`,
             targetId: `char_${pair[1]}`,
-            type: familyType.type,
+            type: familyType.type as Relation['type'],
           });
         }
       }

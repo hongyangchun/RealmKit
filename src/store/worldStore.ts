@@ -471,10 +471,12 @@ export const useWorldStore = create<WorldStore>((set, get) => {
         }
         const updated = { ...oldCity, ...patch };
         const faction = s.data.factions.find((f) => f.id === updated.factionId);
-        const newKey = `city:${updated.gridX},${updated.gridY}`;
+        const gridX = updated.gridX ?? 0;
+        const gridY = updated.gridY ?? 0;
+        const newKey = `city:${gridX},${gridY}`;
         newCells[newKey] = {
-          x: updated.gridX,
-          y: updated.gridY,
+          x: gridX,
+          y: gridY,
           color: faction?.color ?? '#8B4513',
           layerId: 'city',
         };

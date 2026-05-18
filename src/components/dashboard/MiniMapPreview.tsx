@@ -196,7 +196,7 @@ const MiniMapPreview: React.FC = () => {
     // ── 1. 渲染地形 ──
     Object.entries(cells).forEach(([key, cell]) => {
       const [x, y] = key.split(',').map(Number);
-      const terrainColor = TERRAIN_COLORS[cell.terrain] ?? '#82e0aa';
+      const terrainColor = TERRAIN_COLORS[cell.terrain ?? ''] ?? '#82e0aa';
       ctx.fillStyle = terrainColor;
       ctx.fillRect(x * cellW, y * cellH, Math.ceil(cellW), Math.ceil(cellH));
     });
@@ -206,7 +206,7 @@ const MiniMapPreview: React.FC = () => {
     ctx.strokeStyle = 'rgba(26, 82, 118, 0.35)';
     ctx.lineWidth = 1.5;
     Object.entries(cells).forEach(([key, cell]) => {
-      if (WATER_TYPES.has(cell.terrain)) return;
+      if (!cell.terrain || WATER_TYPES.has(cell.terrain)) return;
       const [x, y] = key.split(',').map(Number);
       const px = x * cellW;
       const py = y * cellH;
@@ -220,7 +220,7 @@ const MiniMapPreview: React.FC = () => {
       neighbors.forEach(({ dx, dy, x1, y1, x2, y2 }) => {
         const nk = `${x + dx},${y + dy}`;
         const neighbor = cells[nk];
-        if (!neighbor || WATER_TYPES.has(neighbor.terrain)) {
+        if (!neighbor || !neighbor.terrain || WATER_TYPES.has(neighbor.terrain)) {
           ctx.beginPath();
           ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
@@ -263,7 +263,7 @@ const MiniMapPreview: React.FC = () => {
         const nk = `${x + dx},${y + dy}`;
         const neighbor = cells[nk];
         if (!neighbor || neighbor.factionId !== cell.factionId) {
-          factionBorders[cell.factionId].push({ x1, y1, x2, y2 });
+          factionBorders[cell.factionId!].push({ x1, y1, x2, y2 });
         }
       });
     });

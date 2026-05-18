@@ -42,7 +42,7 @@ const RelationForm: React.FC<RelationFormProps> = ({
 
   const [sourceId, setSourceIdRaw] = useState('');
   const [targetId, setTargetIdRaw] = useState('');
-  const [relationType, setRelationTypeRaw] = useState<string>(RELATION_TYPES[0]);
+  const [relationType, setRelationTypeRaw] = useState<typeof RELATION_TYPES[number]>(RELATION_TYPES[0]);
   const [description, setDescriptionRaw] = useState('');
 
   const d = <T,>(fn: React.Dispatch<React.SetStateAction<T>>) =>
@@ -165,7 +165,7 @@ const RelationForm: React.FC<RelationFormProps> = ({
             select
             label="关系类型"
             value={relationType}
-            onChange={(e) => setRelationType(e.target.value)}
+            onChange={(e) => setRelationType(e.target.value as typeof RELATION_TYPES[number])}
             fullWidth
             size="small"
             sx={{ mb: 2 }}

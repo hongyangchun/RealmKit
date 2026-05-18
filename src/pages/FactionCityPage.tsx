@@ -21,6 +21,7 @@ import FactionForm from '../components/faction/FactionForm';
 import CityForm from '../components/city/CityForm';
 import type { Faction, City } from '../types';
 import { useWorldStore } from '../store/worldStore';
+import { v4 as uuidv4 } from 'uuid';
 import { useSearchParams } from 'react-router-dom';
 
 const FactionCityPage: React.FC = () => {
@@ -355,6 +356,7 @@ const FactionCityPage: React.FC = () => {
         onSave={handleSaveCity}
         initialData={
           editingCity ?? {
+            id: uuidv4(),
             name: '',
             factionId: cityFormFactionId,
             gridX: 50,

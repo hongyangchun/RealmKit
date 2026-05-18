@@ -115,6 +115,8 @@ export interface GridCell {
   y: number; // 网格行索引
   color: string; // 填充颜色
   layerId: LayerId; // 属于哪个图层
+  terrain?: string; // 地形类型（terrain 图层使用）
+  factionId?: string; // 所属势力 ID（territory 图层使用）
 }
 
 /** 网格绘制数据 */
