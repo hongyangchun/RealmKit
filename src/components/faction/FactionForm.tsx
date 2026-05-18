@@ -45,7 +45,7 @@ const FactionForm: React.FC<FactionFormProps> = ({
   const sfx = useSFX();
 
   const [name, setNameRaw] = useState('');
-  const [color, setColorRaw] = useState(PRESET_COLORS[0]);
+  const [color, setColorRaw] = useState<string>(PRESET_COLORS[0]);
   const [description, setDescriptionRaw] = useState('');
   const [foundedYear, setFoundedYearRaw] = useState<string>('');
   const [dissolvedYear, setDissolvedYearRaw] = useState<string>('');
