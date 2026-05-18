@@ -24,6 +24,7 @@ import ColorLensIcon from '@mui/icons-material/ColorLens';
 import type { Faction } from '../../types';
 import { useDirtyCheck } from '../../hooks/useDirtyCheck';
 import { useSFX } from '../../hooks/useSFX';
+import { PRESET_COLORS } from '../../constants/colors';
 
 interface FactionFormProps {
   open: boolean;
@@ -32,22 +33,6 @@ interface FactionFormProps {
   initialData?: Faction;
   mode: 'create' | 'edit';
 }
-
-// 预设颜色
-const PRESET_COLORS = [
-  '#C41E3A', // 深红
-  '#8B4513', // 棕色
-  '#1a237e', // 深蓝
-  '#2E7D32', // 绿色
-  '#7B1FA2', // 紫色
-  '#F57C00', // 橙色
-  '#00838F', // 青色
-  '#37474F', // 深灰
-  '#B71C1C', // 暗红
-  '#0D47A1', // 靛蓝
-  '#E65100', // 深橙
-  '#1B5E20', // 森林绿
-];
 
 const FactionForm: React.FC<FactionFormProps> = ({
   open,

@@ -16,24 +16,7 @@ import MapIcon from '@mui/icons-material/Map';
 import ExploreIcon from '@mui/icons-material/Explore';
 import { useWorldStore } from '../../store/worldStore';
 import type { Faction, City } from '../../types';
-
-// ─── 颜色映射 ──────────────────────────────────────────────────────────────
-const TERRAIN_COLORS: Record<string, string> = {
-  deep_ocean: '#1a5276',
-  ocean: '#2980b9',
-  shallow_water: '#5dade2',
-  beach: '#f9e79f',
-  grassland: '#82e0aa',
-  forest: '#27ae60',
-  dense_forest: '#1e8449',
-  hill: '#a9dfbf',
-  mountain: '#7f8c8d',
-  snow_peak: '#d5dbdb',
-  desert: '#f0b27a',
-  swamp: '#76d7c4',
-  tundra: '#d5dbdb',
-  volcanic: '#c0392b',
-};
+import { MINIMAP_TERRAIN_COLORS as TERRAIN_COLORS } from '../../constants/colors';
 
 const WATER_TYPES = new Set(['deep_ocean', 'ocean', 'shallow_water']);
 

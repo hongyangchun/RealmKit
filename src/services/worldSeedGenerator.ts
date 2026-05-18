@@ -17,6 +17,7 @@ import type {
   TerritoryCell,
 } from '../types';
 import { mapGenerator } from './mapGenerator';
+import { FACTION_TERRITORY_COLORS } from '../constants/colors';
 
 // =============================================================================
 // 类型定义（内部使用）
@@ -285,7 +286,7 @@ const NAME_BANKS: Record<WorldStyle, NameBank> = {
 };
 
 /** 势力颜色调色板（最多 6 种，足够 6 个势力） */
-const FACTION_COLORS = ['#8B0000', '#00008B', '#006400', '#8B4513', '#4B0082', '#B8860B'];
+const FACTION_COLORS = [...FACTION_TERRITORY_COLORS];
 
 /** 世界风格中文标签 */
 export const STYLE_LABELS: Record<WorldStyle, { name: string; icon: string; desc: string }> = {

@@ -13,29 +13,7 @@ import {
 } from '@mui/material';
 import PaletteIcon from '@mui/icons-material/Palette';
 import { useWorldStore } from '../../store/worldStore';
-
-// 预设颜色
-const PRESET_COLORS = [
-  '#C0392B', '#E74C3C', '#FF6B6B', '#FFB3B3',
-  '#E67E22', '#F39C12', '#FFB347', '#FFD93D',
-  '#27AE60', '#2ECC71', '#58D68D', '#A9DFBF',
-  '#2980B9', '#3498DB', '#5DADE2', '#AED6F1',
-  '#8E44AD', '#9B59B6', '#AF7AC5', '#D2B4DE',
-  '#1a237e', '#34495E', '#5D6D7E', '#85929E',
-  '#8B4513', '#A0522D', '#CD853F', '#DEB887',
-  '#00BCD4', '#00ACC1', '#26C6DA', '#80DEEA',
-];
-
-// 地形专用颜色
-const TERRAIN_COLORS = {
-  forest: '#228B22',
-  desert: '#EDC9AF',
-  mountain: '#808080',
-  ocean: '#1E90FF',
-  swamp: '#556B2F',
-  snow: '#F0F8FF',
-  volcano: '#8B0000',
-};
+import { PRESET_COLORS, TERRAIN_DRAW_COLORS } from '../../constants/colors';
 
 const ColorPicker: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
@@ -64,7 +42,7 @@ const ColorPicker: React.FC = () => {
 
   const open = Boolean(anchorEl);
   const showTerrainColors = activeLayerId === 'terrain';
-  const displayColors = showTerrainColors ? Object.values(TERRAIN_COLORS) : PRESET_COLORS;
+  const displayColors = showTerrainColors ? Object.values(TERRAIN_DRAW_COLORS) : [...PRESET_COLORS];
 
   return (
     <>

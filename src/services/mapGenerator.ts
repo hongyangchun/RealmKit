@@ -13,11 +13,12 @@ import type {
   MapGenResult,
 } from '../types';
 import { TERRAIN_COLORS } from '../types';
+import { FACTION_TERRITORY_COLORS } from '../constants/colors';
 
 // =============================================================================
 // 势力颜色调色板（最多 6 种）
 // =============================================================================
-const FACTION_COLORS = ['#8B0000', '#00008B', '#006400', '#8B4513', '#4B0082', '#B8860B'];
+const FACTION_COLORS = [...FACTION_TERRITORY_COLORS];
 
 // =============================================================================
 // 地形参数配置
