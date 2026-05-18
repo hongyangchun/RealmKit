@@ -11,7 +11,9 @@ import {
   Button,
   TextField,
   MenuItem,
-  Modal,
+  Dialog,
+  DialogTitle,
+  DialogContent,
   Snackbar,
   Alert,
   IconButton,
@@ -315,6 +317,9 @@ const CharacterPage: React.FC = () => {
             onChange={(e) => setFilterFaction(e.target.value)}
             size="small"
             sx={{ minWidth: 140 }}
+            SelectProps={{
+              MenuProps: { sx: { zIndex: 10001 }, disablePortal: false },
+            }}
           >
             <MenuItem value="all">全部势力</MenuItem>
             {factions.map((f) => (
@@ -508,29 +513,30 @@ const CharacterPage: React.FC = () => {
       )}
 
       {/* ── Form dialog ── */}
-      <Modal
+      <Dialog
         open={showForm}
         onClose={() => {
           setShowForm(false);
           setEditingChar(null);
         }}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+        maxWidth="sm"
+        fullWidth
       >
-        <Box sx={{ background: '#fff', borderRadius: 2, boxShadow: 24, maxWidth: 600, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
-          <CharacterForm
-            initialData={editingChar ?? undefined}
-            onSave={handleSave}
-            onCancel={() => {
-              setShowForm(false);
-              setEditingChar(null);
-            }}
-          />
-        </Box>
-      </Modal>
+        <DialogTitle sx={{ fontFamily: "'LXGW WenKai TC', serif", display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box>{editingChar ? '编辑人物' : '新建人物'}</Box>
+          <IconButton onClick={() => { setShowForm(false); setEditingChar(null); }} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <CharacterForm
+          initialData={editingChar ?? undefined}
+          onSave={handleSave}
+          onCancel={() => {
+            setShowForm(false);
+            setEditingChar(null);
+          }}
+        />
+      </Dialog>
 
       {/* ── Delete confirm ── */}
       <ConfirmDialog

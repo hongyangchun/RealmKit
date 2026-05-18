@@ -10,6 +10,7 @@ import {
   DialogActions,
   Button,
 } from '@mui/material';
+import { useSFX } from '../../hooks/useSFX';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -32,6 +33,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
   severity = 'warning',
 }) => {
+  const sfx = useSFX();
   const confirmColor =
     severity === 'error' ? 'error' : severity === 'warning' ? 'warning' : 'primary';
 
@@ -45,7 +47,14 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <Button onClick={onCancel} color="inherit">
           {cancelLabel}
         </Button>
-        <Button onClick={onConfirm} color={confirmColor} variant="contained">
+        <Button
+          onClick={() => {
+            sfx.play('ui/click');
+            onConfirm();
+          }}
+          color={confirmColor}
+          variant="contained"
+        >
           {confirmLabel}
         </Button>
       </DialogActions>

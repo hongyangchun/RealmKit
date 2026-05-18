@@ -13,6 +13,7 @@ import {
   Chip,
   Tooltip,
   Checkbox,
+  keyframes,
 } from '@mui/material';
 import ConflictBadge from '../common/ConflictBadge';
 import SkillChip from './SkillChip';
@@ -20,6 +21,51 @@ import LifecycleBar from './LifecycleBar';
 import CharacterCardExporter from './CharacterCardExporter';
 import type { Character, HistoryEvent } from '../../types';
 import { useWorldStore } from '../../store/worldStore';
+
+// ─── 叙事化装饰动画 ───────────────────────────────────────
+
+/** 金色光晕脉冲 — 悬停时在边框上显现 */
+const borderGlow = keyframes`
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(255,213,79,0.0), inset 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(255,213,79,0.25), inset 0 0 12px rgba(255,213,79,0.05);
+  }
+`;
+
+// ─── 势力纹样装饰 SVG ─────────────────────────────────────
+
+/** 生成势力色带纹样 — 根据势力颜色生成古典花纹 */
+function FactionPattern({ color }: { color: string }) {
+  return (
+    <Box
+      sx={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 4,
+        overflow: 'hidden',
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '100%',
+          background: `repeating-linear-gradient(
+            -45deg,
+            transparent,
+            transparent 3px,
+            ${color}33 3px,
+            ${color}33 6px
+          )`,
+        },
+      }}
+    />
+  );
+}
 
 interface CharacterCardProps {
   character: Character;
@@ -92,16 +138,31 @@ const CharacterCard = React.memo<CharacterCardProps>(({
         borderRadius: '0 12px 12px 0',
         background: selected ? '#e8edf8' : '#fffef8',
         cursor: 'pointer',
-        transition: 'transform 0.2s, box-shadow 0.2s, background 0.2s',
+        transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s',
         transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
         boxShadow: hovered
-          ? '0 8px 24px rgba(26,35,126,0.15)'
+          ? `0 8px 24px rgba(26,35,126,0.15), 0 0 0 1px ${factionColor}20`
           : '0 2px 8px rgba(0,0,0,0.08)',
         overflow: 'visible',
-        outline: selected ? `2px solid #1a237e` : 'none',
+        outline: selected ? '2px solid #1a237e' : 'none',
         outlineOffset: -2,
+        // 叙事层：悬停时触发金色光晕
+        animation: hovered ? `${borderGlow} 2s ease-in-out infinite` : 'none',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: 60,
+          height: 60,
+          background: `radial-gradient(circle at top right, ${factionColor}10 0%, transparent 70%)`,
+          pointerEvents: 'none',
+          borderRadius: '0 12px 0 0',
+        },
       }}
     >
+      {/* 势力纹样装饰 — 左侧色带叠加斜纹 */}
+      <FactionPattern color={factionColor} />
       {/* 多选 Checkbox - 左上角 */}
       {selectionMode && (
         <Box
@@ -155,6 +216,10 @@ const CharacterCard = React.memo<CharacterCardProps>(({
               mr: 1.5,
               border: `2px solid ${factionColor}`,
               fontSize: '1.5rem',
+              boxShadow: hovered
+                ? `0 0 12px ${factionColor}40, 0 2px 8px rgba(0,0,0,0.1)`
+                : 'none',
+              transition: 'box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
             {character.name.charAt(0)}

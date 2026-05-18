@@ -131,6 +131,9 @@ const CityForm: React.FC<CityFormProps> = ({
   const selectedFaction = factions.find((f) => f.id === factionId);
   const bannerColor = selectedFaction?.color ?? '#8B4513';
 
+  /** 高 z-index 确保下拉菜单不被浮层/Modal 遮挡 */
+  const selectMenuProps = { sx: { zIndex: 10001 }, disablePortal: false };
+
   return (
     <Dialog
       open={open}
@@ -191,6 +194,7 @@ const CityForm: React.FC<CityFormProps> = ({
                 value={factionId}
                 label="所属势力"
                 onChange={(e) => setFactionId(e.target.value)}
+                MenuProps={selectMenuProps}
               >
                 {factions.map((f) => (
                   <MenuItem key={f.id} value={f.id}>
@@ -219,6 +223,7 @@ const CityForm: React.FC<CityFormProps> = ({
                 value={type}
                 label="城市类型"
                 onChange={(e) => setType(e.target.value as City['type'])}
+                MenuProps={selectMenuProps}
               >
                 {CITY_TYPES.map((t) => (
                   <MenuItem key={t.value} value={t.value}>

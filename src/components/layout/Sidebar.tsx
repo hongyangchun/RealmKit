@@ -16,30 +16,34 @@ import {
   Box,
   Typography,
 } from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import MapIcon from '@mui/icons-material/Map';
-import PeopleIcon from '@mui/icons-material/People';
-import TimelineIcon from '@mui/icons-material/Timeline';
-import HubIcon from '@mui/icons-material/Hub';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import ExploreIcon from '@mui/icons-material/Explore';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import PeopleIcon from '@mui/icons-material/People';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SettingsDialog from './SettingsDialog';
+import { useSFX } from '../../hooks/useSFX';
+
+// ─── 叙事化导航配置 ───────────────────────────────────────
 
 interface NavItem {
   label: string;
+  /** 叙事化标签 — 悬停时显示的诗意名称 */
+  narrativeLabel: string;
   icon: React.ReactNode;
   path: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: '总览仪表盘', icon: <DashboardIcon />, path: '/' },
-  { label: '世界地图', icon: <MapIcon />, path: '/map' },
-  { label: '势力疆域', icon: <AccountBalanceIcon />, path: '/factions' },
-  { label: '人物设计', icon: <PeopleIcon />, path: '/characters' },
-  { label: '历史时间轴', icon: <TimelineIcon />, path: '/timeline' },
-  { label: '世界编年史', icon: <MenuBookIcon />, path: '/chronicle' },
+  { label: '总览', narrativeLabel: '星穹之眼', icon: <AutoAwesomeIcon />, path: '/' },
+  { label: '地图', narrativeLabel: '大陆图鉴', icon: <ExploreIcon />, path: '/map' },
+  { label: '势力', narrativeLabel: '王权之座', icon: <AccountBalanceIcon />, path: '/factions' },
+  { label: '人物', narrativeLabel: '英雄名录', icon: <PeopleIcon />, path: '/characters' },
+  { label: '时间轴', narrativeLabel: '时光长河', icon: <HourglassEmptyIcon />, path: '/timeline' },
+  { label: '编年史', narrativeLabel: '史册典籍', icon: <MenuBookIcon />, path: '/chronicle' },
 ];
 
 interface SidebarProps {
@@ -55,6 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const sfx = useSFX();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState(0);
 
@@ -123,12 +128,17 @@ const Sidebar: React.FC<SidebarProps> = ({
           return (
             <ListItem key={item.path} disablePadding sx={{ display: 'block' }}>
               <Tooltip
-                title={!open ? item.label : ''}
+                title={!open ? `${item.narrativeLabel}·${item.label}` : ''}
                 placement="right"
                 arrow
               >
                 <ListItemButton
-                  onClick={() => navigate(item.path)}
+                  onClick={() => {
+                    if (location.pathname !== item.path) {
+                      sfx.playTabSwitch();
+                    }
+                    navigate(item.path);
+                  }}
                   sx={{
                     minHeight: 48,
                     justifyContent: open ? 'initial' : 'center',
@@ -139,32 +149,80 @@ const Sidebar: React.FC<SidebarProps> = ({
                     background: isActive
                       ? 'rgba(250,243,224,0.18)'
                       : 'transparent',
+                    position: 'relative',
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                     '&:hover': {
                       background: 'rgba(250,243,224,0.12)',
+                      transform: 'translateX(2px)',
+                    },
+                    '&:hover .nav-icon': {
+                      transform: isActive ? 'scale(1.1)' : 'scale(1.15)',
+                      filter: isActive ? undefined : 'drop-shadow(0 0 4px rgba(255,213,79,0.3))',
+                    },
+                    '&:hover .narrative-hint': {
+                      opacity: 1,
                     },
                   }}
                 >
+                  {/* 活跃指示器 — 左侧金色竖条 */}
+                  {isActive && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        left: 0,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 3,
+                        height: 20,
+                        borderRadius: '0 2px 2px 0',
+                        background: '#ffd54f',
+                        boxShadow: '0 0 6px rgba(255,213,79,0.4)',
+                      }}
+                    />
+                  )}
                   <ListItemIcon
+                    className="nav-icon"
                     sx={{
                       minWidth: 0,
                       mr: open ? 2 : 'auto',
                       justifyContent: 'center',
                       color: isActive ? '#ffd54f' : 'rgba(250,243,224,0.8)',
+                      transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s',
                     }}
                   >
                     {item.icon}
                   </ListItemIcon>
                   {open && (
                     <ListItemText
-                      primary={item.label}
-                      primaryTypographyProps={{
-                        sx: {
-                          color: isActive ? '#ffd54f' : '#faf3e0',
-                          fontWeight: isActive ? 600 : 400,
-                          fontSize: '0.9rem',
-                          whiteSpace: 'nowrap',
-                        },
-                      }}
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                          <Typography
+                            component="span"
+                            sx={{
+                              color: isActive ? '#ffd54f' : '#faf3e0',
+                              fontWeight: isActive ? 600 : 400,
+                              fontSize: '0.9rem',
+                              whiteSpace: 'nowrap',
+                              fontFamily: "'LXGW WenKai TC', serif",
+                            }}
+                          >
+                            {item.label}
+                          </Typography>
+                          <Typography
+                            className="narrative-hint"
+                            component="span"
+                            sx={{
+                              color: 'rgba(255,213,79,0.5)',
+                              fontSize: '0.65rem',
+                              opacity: 0,
+                              transition: 'opacity 0.25s',
+                              fontStyle: 'italic',
+                            }}
+                          >
+                            {item.narrativeLabel}
+                          </Typography>
+                        </Box>
+                      }
                     />
                   )}
                 </ListItemButton>
@@ -181,7 +239,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           <ListItem disablePadding sx={{ display: 'block' }}>
             <Tooltip title={!open ? '设置' : ''} placement="right" arrow>
               <ListItemButton
-                onClick={() => openSettings(0)}
+                onClick={() => {
+                  sfx.playClick();
+                  openSettings(0);
+                }}
                 sx={{
                   minHeight: 40,
                   justifyContent: open ? 'initial' : 'center',

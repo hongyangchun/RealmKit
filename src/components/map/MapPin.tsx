@@ -10,6 +10,7 @@ import {
 import PlaceIcon from '@mui/icons-material/Place';
 import type { MapPin as MapPinType } from '../../types';
 import { useWorldStore } from '../../store/worldStore';
+import { useSFX } from '../../hooks/useSFX';
 
 interface MapPinProps {
   pin: MapPinType;
@@ -25,10 +26,11 @@ const MapPinComponent: React.FC<MapPinProps> = ({ pin, onClick, selected }) => {
   const faction = useWorldStore((s) =>
     s.data.factions.find((f) => f.id === pin.factionId)
   );
+  const sfx = useSFX();
 
   return (
     <Box
-      onMouseEnter={(e) => setAnchorEl(e.currentTarget)}
+      onMouseEnter={(e) => { setAnchorEl(e.currentTarget); sfx.play('sfx/pin_hover'); }}
       onMouseLeave={() => setAnchorEl(null)}
       sx={{
         position: 'absolute',
@@ -41,7 +43,7 @@ const MapPinComponent: React.FC<MapPinProps> = ({ pin, onClick, selected }) => {
     >
       {/* Pin icon */}
       <Box
-        onClick={() => onClick?.(pin)}
+        onClick={() => { sfx.play('sfx/pin_drop'); onClick?.(pin); }}
         sx={{
           display: 'flex',
           flexDirection: 'column',

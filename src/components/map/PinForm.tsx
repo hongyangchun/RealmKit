@@ -102,6 +102,9 @@ const PinForm: React.FC<PinFormProps> = ({
         fullWidth
         size="small"
         sx={{ mb: 2 }}
+        SelectProps={{
+          MenuProps: { sx: { zIndex: 10001 }, disablePortal: false },
+        }}
       >
         <MenuItem value="">无</MenuItem>
         {factions.map((f) => (

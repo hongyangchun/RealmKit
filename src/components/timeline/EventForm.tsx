@@ -9,8 +9,11 @@ import {
   MenuItem,
   Typography,
   Grid,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import type { HistoryEvent } from '../../types';
+import { useSFX } from '../../hooks/useSFX';
 import { useWorldStore } from '../../store/worldStore';
 import { useDirtyCheck } from '../../hooks/useDirtyCheck';
 
@@ -34,6 +37,7 @@ const EventForm: React.FC<EventFormProps> = ({
   const factions = useWorldStore((s) => s.data.factions);
   const characters = useWorldStore((s) => s.data.characters);
   const cities = useWorldStore((s) => s.data.cities);
+  const sfx = useSFX();
   const events = useWorldStore((s) => s.data.events);
 
   const { markDirty, resetDirty, handleCancel } = useDirtyCheck(onCancel);
@@ -119,95 +123,101 @@ const EventForm: React.FC<EventFormProps> = ({
       characterIds: selectedCharacterIds,
       cityId: selectedCityId || undefined,
     });
+    sfx.play('sfx/event_create');
     resetDirty();
   };
 
+  /** 高 z-index 确保下拉菜单不被浮层/Modal 遮挡 */
+  const menuProps = {
+    sx: { zIndex: 10001 },
+    disablePortal: false,
+  };
+
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ p: 2, maxWidth: 480 }}>
-      <Typography variant="h6" sx={{ fontFamily: "'LXGW WenKai TC', serif", mb: 2 }}>
-        {initialData ? '编辑事件' : '新增事件'}
-      </Typography>
+    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 480 }}>
+      <DialogContent sx={{ pt: 1 }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12}>
+            <TextField label="事件标题" value={title} onChange={(e) => setTitle(e.target.value)} required fullWidth size="small" />
+          </Grid>
+          <Grid item xs={4}>
+            <TextField label="年份" type="number" value={year} onChange={(e) => setYear(e.target.value)} required fullWidth size="small" />
+          </Grid>
+          <Grid item xs={4}>
+            <TextField label="月份（选填）" type="number" value={month} onChange={(e) => setMonth(e.target.value)} fullWidth size="small" inputProps={{ min: 1, max: 12 }} />
+          </Grid>
+          <Grid item xs={4}>
+            <TextField label="地点" value={location} onChange={(e) => setLocation(e.target.value)} fullWidth size="small" />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField label="事件描述" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={3} fullWidth size="small" />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              select
+              label="关联势力"
+              SelectProps={{ multiple: true, MenuProps: menuProps }}
+              value={selectedFactionIds}
+              onChange={(e) =>
+                setSelectedFactionIds(
+                  typeof e.target.value === 'string' ? [] : e.target.value
+                )
+              }
+              fullWidth
+              size="small"
+            >
+              {factions.length === 0 && <MenuItem disabled>暂无势力</MenuItem>}
+              {factions.map((f) => (
+                <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              select
+              label="关联人物"
+              SelectProps={{ multiple: true, MenuProps: menuProps }}
+              value={selectedCharacterIds}
+              onChange={(e) =>
+                setSelectedCharacterIds(
+                  typeof e.target.value === 'string' ? [] : e.target.value
+                )
+              }
+              fullWidth
+              size="small"
+            >
+              {characters.length === 0 && <MenuItem disabled>暂无人物</MenuItem>}
+              {characters.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              select
+              label="关联城市"
+              SelectProps={{ MenuProps: menuProps }}
+              value={selectedCityId}
+              onChange={(e) => setSelectedCityId(e.target.value)}
+              fullWidth
+              size="small"
+            >
+              <MenuItem value="">无</MenuItem>
+              {cities.map((c) => (
+                <MenuItem key={c.id} value={c.id}>{c.name} ({c.type === 'capital' ? '首都' : c.type === 'fortress' ? '要塞' : c.type === 'port' ? '港口' : c.type === 'holy_site' ? '圣地' : '村庄'})</MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12}>
+            <TextField label="标签（逗号分隔）" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} fullWidth size="small" placeholder="如：战争、政治、外交" />
+          </Grid>
+        </Grid>
+      </DialogContent>
 
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <TextField label="事件标题" value={title} onChange={(e) => setTitle(e.target.value)} required fullWidth size="small" />
-        </Grid>
-        <Grid item xs={4}>
-          <TextField label="年份" type="number" value={year} onChange={(e) => setYear(e.target.value)} required fullWidth size="small" />
-        </Grid>
-        <Grid item xs={4}>
-          <TextField label="月份（选填）" type="number" value={month} onChange={(e) => setMonth(e.target.value)} fullWidth size="small" inputProps={{ min: 1, max: 12 }} />
-        </Grid>
-        <Grid item xs={4}>
-          <TextField label="地点" value={location} onChange={(e) => setLocation(e.target.value)} fullWidth size="small" />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField label="事件描述" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={3} fullWidth size="small" />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            select
-            label="关联势力"
-            SelectProps={{ multiple: true }}
-            value={selectedFactionIds}
-            onChange={(e) =>
-              setSelectedFactionIds(
-                typeof e.target.value === 'string' ? [] : e.target.value
-              )
-            }
-            fullWidth
-            size="small"
-          >
-            {factions.length === 0 && <MenuItem disabled>暂无势力</MenuItem>}
-            {factions.map((f) => (
-              <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            select
-            label="关联人物"
-            SelectProps={{ multiple: true }}
-            value={selectedCharacterIds}
-            onChange={(e) =>
-              setSelectedCharacterIds(
-                typeof e.target.value === 'string' ? [] : e.target.value
-              )
-            }
-            fullWidth
-            size="small"
-          >
-            {characters.length === 0 && <MenuItem disabled>暂无人物</MenuItem>}
-            {characters.map((c) => (
-              <MenuItem key={c.id} value={c.id}>{c.name}</MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            select
-            label="关联城市"
-            value={selectedCityId}
-            onChange={(e) => setSelectedCityId(e.target.value)}
-            fullWidth
-            size="small"
-          >
-            <MenuItem value="">无</MenuItem>
-            {cities.map((c) => (
-              <MenuItem key={c.id} value={c.id}>{c.name} ({c.type === 'capital' ? '首都' : c.type === 'fortress' ? '要塞' : c.type === 'port' ? '港口' : c.type === 'holy_site' ? '圣地' : '村庄'})</MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-        <Grid item xs={12}>
-          <TextField label="标签（逗号分隔）" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} fullWidth size="small" placeholder="如：战争、政治、外交" />
-        </Grid>
-      </Grid>
-
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={handleCancel}>取消</Button>
         <Button variant="contained" type="submit" sx={{ background: '#1a237e' }}>保存</Button>
-      </Box>
+      </DialogActions>
     </Box>
   );
 };

@@ -73,6 +73,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
           label="势力"
           onChange={(e) => onChange({ ...filter, factionId: e.target.value })}
           sx={{ fontSize: '0.8rem', background: '#fff', borderRadius: 1 }}
+          MenuProps={{ sx: { zIndex: 10001 }, disablePortal: false }}
         >
           <MenuItem value="">全部</MenuItem>
           {factions.map((f) => (
@@ -102,6 +103,7 @@ const TimelineFilterBar: React.FC<TimelineFilterBarProps> = ({
           label="角色"
           onChange={(e) => onChange({ ...filter, characterId: e.target.value })}
           sx={{ fontSize: '0.8rem', background: '#fff', borderRadius: 1 }}
+          MenuProps={{ sx: { zIndex: 10001 }, disablePortal: false }}
         >
           <MenuItem value="">全部</MenuItem>
           {characters.map((c) => (

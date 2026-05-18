@@ -233,6 +233,7 @@ const ChronicleForm: React.FC<ChronicleFormProps> = ({
             label="标题命名方式"
             onChange={(e) => setTitleMode(e.target.value as 'auto' | 'custom')}
             disabled={isGenerating}
+            MenuProps={{ sx: { zIndex: 10001 }, disablePortal: false }}
             sx={{
               background: 'rgba(255,255,255,0.5)',
               '& .MuiOutlinedInput-notchedOutline': {

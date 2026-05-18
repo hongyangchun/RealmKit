@@ -10,6 +10,8 @@ import {
   Typography,
   Grid,
   IconButton,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -122,150 +124,154 @@ const CharacterForm: React.FC<CharacterFormProps> = ({
     setSkills((prev) => prev.filter((_, i) => i !== index));
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ p: 2 }}>
-      <Typography variant="h6" sx={{ fontFamily: "'LXGW WenKai TC', serif", mb: 2 }}>
-        {initialData ? '编辑人物' : '新建人物'}
-      </Typography>
-
-      {/* Avatar */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
-        <AvatarUploader
-          currentAvatar={avatar}
-          onAvatarChange={setAvatar}
-          characterName={name}
-          factionColor={factionColor}
-        />
-      </Box>
-
-      <Grid container spacing={2}>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            label="姓名"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            fullWidth
-            size="small"
+    <Box component="form" onSubmit={handleSubmit}>
+      <DialogContent sx={{ pt: 1 }}>
+        {/* Avatar */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <AvatarUploader
+            currentAvatar={avatar}
+            onAvatarChange={setAvatar}
+            characterName={name}
+            factionColor={factionColor}
           />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            label="职衔"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            fullWidth
-            size="small"
-            placeholder="如：大将军、丞相"
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            label="所属势力/国家"
-            value={factionId}
-            onChange={(e) => setFactionId(e.target.value)}
-            select
-            fullWidth
-            required
-            size="small"
-          >
-            {factions.map((f) => (
-              <MenuItem key={f.id} value={f.id}>
-                {f.name}
-              </MenuItem>
+        </Box>
+
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="姓名"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              fullWidth
+              size="small"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="职衔"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              fullWidth
+              size="small"
+              placeholder="如：大将军、丞相"
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              label="所属势力/国家"
+              value={factionId}
+              onChange={(e) => setFactionId(e.target.value)}
+              select
+              fullWidth
+              required
+              size="small"
+              SelectProps={{
+                MenuProps: { sx: { zIndex: 10001 }, disablePortal: false },
+              }}
+            >
+              {factions.map((f) => (
+                <MenuItem key={f.id} value={f.id}>
+                  {f.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={6}>
+            <TextField
+              label="出生年份"
+              type="number"
+              value={birthYear}
+              onChange={(e) => setBirthYear(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          </Grid>
+          <Grid item xs={6}>
+            <TextField
+              label="去世年份（留空=在世）"
+              type="number"
+              value={deathYear}
+              onChange={(e) => setDeathYear(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              label="传记"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              multiline
+              rows={3}
+              fullWidth
+              size="small"
+            />
+          </Grid>
+
+          {/* Skills */}
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" sx={{ mt: 1 }}>技能</Typography>
+            {skills.map((skill, idx) => (
+              <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
+                <TextField
+                  label="技能名"
+                  value={skill.name}
+                  onChange={(e) => updateSkill(idx, { name: e.target.value })}
+                  size="small"
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  select
+                  label="类型"
+                  value={skill.type}
+                  onChange={(e) =>
+                    updateSkill(idx, { type: e.target.value as Skill['type'] })
+                  }
+                  size="small"
+                  sx={{ width: 100 }}
+                  SelectProps={{
+                    MenuProps: { sx: { zIndex: 10001 }, disablePortal: false },
+                  }}
+                >
+                  <MenuItem value="active">主动</MenuItem>
+                  <MenuItem value="passive">被动</MenuItem>
+                  <MenuItem value="special">特殊</MenuItem>
+                </TextField>
+                <IconButton
+                  onClick={() => removeSkill(idx)}
+                  color="error"
+                  size="small"
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
             ))}
-          </TextField>
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            label="出生年份"
-            type="number"
-            value={birthYear}
-            onChange={(e) => setBirthYear(e.target.value)}
-            fullWidth
-            size="small"
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            label="去世年份（留空=在世）"
-            type="number"
-            value={deathYear}
-            onChange={(e) => setDeathYear(e.target.value)}
-            fullWidth
-            size="small"
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField
-            label="传记"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            multiline
-            rows={3}
-            fullWidth
-            size="small"
-          />
-        </Grid>
+            <Button startIcon={<AddIcon />} size="small" onClick={addSkill}>
+              添加技能
+            </Button>
+          </Grid>
 
-        {/* Skills */}
-        <Grid item xs={12}>
-          <Typography variant="subtitle2" sx={{ mt: 1 }}>技能</Typography>
-          {skills.map((skill, idx) => (
-            <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1 }}>
-              <TextField
-                label="技能名"
-                value={skill.name}
-                onChange={(e) => updateSkill(idx, { name: e.target.value })}
-                size="small"
-                sx={{ flex: 1 }}
-              />
-              <TextField
-                select
-                label="类型"
-                value={skill.type}
-                onChange={(e) =>
-                  updateSkill(idx, { type: e.target.value as Skill['type'] })
-                }
-                size="small"
-                sx={{ width: 100 }}
-              >
-                <MenuItem value="active">主动</MenuItem>
-                <MenuItem value="passive">被动</MenuItem>
-                <MenuItem value="special">特殊</MenuItem>
-              </TextField>
-              <IconButton
-                onClick={() => removeSkill(idx)}
-                color="error"
-                size="small"
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          ))}
-          <Button startIcon={<AddIcon />} size="small" onClick={addSkill}>
-            添加技能
-          </Button>
+          {/* Traits */}
+          <Grid item xs={12}>
+            <TextField
+              label="特质标签（逗号分隔）"
+              value={traitsInput}
+              onChange={(e) => setTraitsInput(e.target.value)}
+              fullWidth
+              size="small"
+              placeholder="如：勇敢、智谋、忠义"
+            />
+          </Grid>
         </Grid>
+      </DialogContent>
 
-        {/* Traits */}
-        <Grid item xs={12}>
-          <TextField
-            label="特质标签（逗号分隔）"
-            value={traitsInput}
-            onChange={(e) => setTraitsInput(e.target.value)}
-            fullWidth
-            size="small"
-            placeholder="如：勇敢、智谋、忠义"
-          />
-        </Grid>
-      </Grid>
-
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={handleCancel}>取消</Button>
         <Button variant="contained" type="submit" sx={{ background: '#1a237e' }}>
           保存
         </Button>
-      </Box>
+      </DialogActions>
     </Box>
   );
 };

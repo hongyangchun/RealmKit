@@ -48,6 +48,22 @@ import AiSettingsDialog from '../components/chronicle/AiSettingsDialog';
 import SettingsDialog from '../components/layout/SettingsDialog';
 import type { ChronicleEntry } from '../types';
 
+/** 获取编年史时间范围内活跃的势力颜色列表 */
+function getChronicleFactionColors(
+  entry: ChronicleEntry,
+  factions: { id: string; color: string; foundedYear?: number; dissolvedYear?: number }[]
+): string[] {
+  return factions
+    .filter((f) => {
+      const founded = f.foundedYear ?? -Infinity;
+      const dissolved = f.dissolvedYear ?? Infinity;
+      // 势力活跃期与编年史时间范围有交集
+      return founded <= entry.endYear && dissolved >= entry.startYear;
+    })
+    .map((f) => f.color)
+    .slice(0, 4); // 最多取4个势力色
+}
+
 const ChroniclePage: React.FC = () => {
   const navigate = useNavigate();
   const { chronicles, createChronicle, updateChronicle, deleteChronicle } = useChronicles();
@@ -296,17 +312,31 @@ const ChroniclePage: React.FC = () => {
                     background: 'linear-gradient(145deg, #faf3e0 0%, #f5e6c8 100%)',
                     border: '2px solid rgba(139,105,20,0.3)',
                     borderRadius: 3,
-                    transition: 'all 0.3s ease',
+                    transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                    position: 'relative',
+                    overflow: 'hidden',
                     '&:hover': {
                       borderColor: '#D4A84B',
                       transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(139,105,20,0.2)',
+                      boxShadow: '0 8px 24px rgba(139,105,20,0.2), 0 0 0 1px rgba(212,168,75,0.2)',
                     },
                   }}
                 >
+                  {/* 势力色带 — 顶部装饰条 */}
+                  <Box
+                    sx={{
+                      height: 4,
+                      background: (() => {
+                        const colors = getChronicleFactionColors(entry, worldData.factions);
+                        if (colors.length === 0) return 'linear-gradient(90deg, #8B6914, #D4A84B)';
+                        if (colors.length === 1) return colors[0];
+                        return `linear-gradient(90deg, ${colors.join(', ')})`;
+                      })(),
+                    }}
+                  />
                   <CardContent>
                     {/* 标题和菜单 */}
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
                       <Typography
                         variant="h6"
                         sx={{
@@ -330,14 +360,20 @@ const ChroniclePage: React.FC = () => {
                     </Box>
 
                     {/* 时间范围 */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                       <CalendarMonthIcon sx={{ fontSize: 16, color: '#8B6914' }} />
                       <Typography variant="body2" sx={{ color: '#8B6914', fontWeight: 600 }}>
                         第 {entry.startYear} - {entry.endYear} 年
                       </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: 'rgba(139,105,20,0.5)', ml: 'auto' }}
+                      >
+                        {entry.content.length} 字
+                      </Typography>
                     </Box>
 
-                    {/* 预览 */}
+                    {/* 预览 — 首字放大 */}
                     <Typography
                       variant="body2"
                       sx={{
@@ -348,12 +384,17 @@ const ChroniclePage: React.FC = () => {
                         WebkitLineClamp: 3,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden',
+                        '&::first-letter': {
+                          fontSize: '1.4em',
+                          fontWeight: 700,
+                          color: '#8B6914',
+                        },
                       }}
                     >
                       {getPreview(entry.content)}
                     </Typography>
 
-                    {/* 日期标签 */}
+                    {/* 底部：日期 + 字数 */}
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Chip
                         label={formatDate(entry.createdAt)}

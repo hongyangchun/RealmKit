@@ -9,13 +9,18 @@ import {
   IconButton,
   Tooltip,
   Button,
+  Dialog,
+  DialogTitle,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import ZoomOutIcon from '@mui/icons-material/ZoomOut';
+import CloseIcon from '@mui/icons-material/Close';
 import { useWorldStore } from '../../store/worldStore';
+import { useSFX } from '../../hooks/useSFX';
 import EventNode from './EventNode';
 import EventForm from './EventForm';
+import { narrativeEra } from '../../theme/narrativeTokens';
 import type { ConflictWarning, HistoryEvent } from '../../types';
 import type { TimelineFilter } from './TimelineFilterBar';
 
@@ -32,6 +37,7 @@ const TimelineCanvas: React.FC<TimelineCanvasProps> = ({ onEventClick, filter })
   const allEvents = useWorldStore((s) => s.data.events);
   const addEvent = useWorldStore((s) => s.addEvent);
   const conflicts = useWorldStore((s) => s.conflicts);
+  const sfx = useSFX();
   const [scale, setScale] = useState(1);
   const [showForm, setShowForm] = useState(false);
 
@@ -133,6 +139,52 @@ const TimelineCanvas: React.FC<TimelineCanvasProps> = ({ onEventClick, filter })
     return laneMap;
   };
 
+  // ─── 时代划分 ─── 根据事件密度自动将时间轴划分为叙事时代
+  const eraSegments = useMemo(() => {
+    if (events.length < 3) return [];
+
+    const sortedEvents = [...events].sort((a, b) => a.year - b.year);
+    const segments: Array<{
+      startYear: number;
+      endYear: number;
+      color: string;
+      label: string;
+    }> = [];
+
+    const SEGMENT_SIZE = Math.max(20, Math.ceil(totalYears / 6));
+    const segmentStart = yearRange.min;
+
+    for (let y = segmentStart; y < yearRange.max; y += SEGMENT_SIZE) {
+      const segEnd = Math.min(y + SEGMENT_SIZE, yearRange.max);
+      const segEvents = sortedEvents.filter((e) => e.year >= y && e.year < segEnd);
+      const density = segEvents.length;
+
+      let color: string;
+      let label: string;
+
+      if (density === 0) {
+        color = 'transparent';
+        label = '';
+      } else if (density <= 2) {
+        color = `${narrativeEra.dawn}60`;
+        label = '开拓期';
+      } else if (density <= 5) {
+        color = `${narrativeEra.prosperity}30`;
+        label = '发展期';
+      } else if (density <= 8) {
+        color = `${narrativeEra.conflict}25`;
+        label = '动荡期';
+      } else {
+        color = `${narrativeEra.conflict}40`;
+        label = '激荡期';
+      }
+
+      segments.push({ startYear: y, endYear: segEnd, color, label });
+    }
+
+    return segments;
+  }, [events, yearRange, totalYears]);
+
   return (
     <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Toolbar */}
@@ -140,13 +192,13 @@ const TimelineCanvas: React.FC<TimelineCanvasProps> = ({ onEventClick, filter })
         <Typography variant="h6" sx={{ fontFamily: "'LXGW WenKai TC', serif", color: '#1a237e' }}>历史时间轴</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Tooltip title="缩小">
-            <IconButton size="small" onClick={() => setScale(Math.max(0.5, scale - 0.2))}>
+            <IconButton size="small" onClick={() => { setScale(Math.max(0.5, scale - 0.2)); sfx.play('sfx/timeline_scroll'); }}>
               <ZoomOutIcon fontSize="small" />
             </IconButton>
           </Tooltip>
           <Typography variant="caption">{Math.round(scale * 100)}%</Typography>
           <Tooltip title="放大">
-            <IconButton size="small" onClick={() => setScale(Math.min(2.5, scale + 0.2))}>
+            <IconButton size="small" onClick={() => { setScale(Math.min(2.5, scale + 0.2)); sfx.play('sfx/timeline_scroll'); }}>
               <ZoomInIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -163,27 +215,20 @@ const TimelineCanvas: React.FC<TimelineCanvasProps> = ({ onEventClick, filter })
       </Box>
 
       {/* Event Form Dialog */}
-      {showForm && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.4)',
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-          onClick={(e) => e.target === e.currentTarget && setShowForm(false)}
-        >
-          <Box sx={{ background: '#fff', borderRadius: 2, boxShadow: 24, maxWidth: 520, width: '90%' }}>
-            <EventForm onSave={handleAddEvent} onCancel={() => setShowForm(false)} />
-          </Box>
-        </Box>
-      )}
+      <Dialog
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontFamily: "'LXGW WenKai TC', serif", display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box>新增事件</Box>
+          <IconButton onClick={() => setShowForm(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <EventForm onSave={handleAddEvent} onCancel={() => setShowForm(false)} />
+      </Dialog>
 
       {/* Timeline content */}
       <Box
@@ -235,6 +280,61 @@ const TimelineCanvas: React.FC<TimelineCanvasProps> = ({ onEventClick, filter })
               }
             )}
           </Box>
+
+          {/* 叙事时代色彩带 */}
+          {eraSegments.length > 0 && (
+            <Box
+              sx={{
+                position: 'relative',
+                pl: 120,
+                pr: 4,
+                minWidth: `${totalYears * YEAR_STEP}px`,
+                height: 24,
+                borderBottom: '1px solid rgba(26,35,126,0.08)',
+              }}
+            >
+              {eraSegments.map((seg, idx) => {
+                const leftPct = ((seg.startYear - yearRange.min) / totalYears) * 100;
+                const widthPct = ((seg.endYear - seg.startYear) / totalYears) * 100;
+                return (
+                  <Tooltip key={idx} title={`${seg.startYear} - ${seg.endYear}: ${seg.label}`}>
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        left: `${leftPct}%`,
+                        width: `${widthPct}%`,
+                        top: 0,
+                        bottom: 0,
+                        background: seg.color,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'default',
+                        transition: 'opacity 0.2s',
+                        '&:hover': { opacity: 1.2 },
+                      }}
+                    >
+                      {widthPct > 8 && seg.label && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            fontSize: '0.6rem',
+                            color: 'rgba(26,35,126,0.5)',
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {seg.label}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Tooltip>
+                );
+              })}
+            </Box>
+          )}
 
           {/* Rows per faction */}
           {eventsByFaction.length > 0 ? (

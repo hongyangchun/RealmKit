@@ -22,6 +22,7 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import { useNavigate } from 'react-router-dom';
 import { useSearchStore } from '../../store/searchStore';
 import { useSearch } from '../../hooks/useSearch';
+import { useSFX } from '../../hooks/useSFX';
 import type { SearchResult } from '../../types';
 
 const TYPE_ICONS: Record<SearchResult['type'], React.ReactNode> = {
@@ -45,8 +46,10 @@ const SearchBar: React.FC = () => {
   const results = useSearch(query);
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
+  const sfx = useSFX();
 
   const handleSelect = (result: SearchResult) => {
+    sfx.play('ui/search_result');
     navigate(result.path);
     reset();
   };
@@ -83,7 +86,10 @@ const SearchBar: React.FC = () => {
             inputRef={inputRef}
             placeholder="搜索人物、事件、地点… (Ctrl+K)"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              if (e.target.value) sfx.play('ui/search_type');
+            }}
             onFocus={() => query && setOpen(true)}
             sx={{
               color: '#faf3e0',

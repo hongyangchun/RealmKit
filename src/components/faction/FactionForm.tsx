@@ -23,6 +23,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ColorLensIcon from '@mui/icons-material/ColorLens';
 import type { Faction } from '../../types';
 import { useDirtyCheck } from '../../hooks/useDirtyCheck';
+import { useSFX } from '../../hooks/useSFX';
 
 interface FactionFormProps {
   open: boolean;
@@ -56,6 +57,7 @@ const FactionForm: React.FC<FactionFormProps> = ({
   mode,
 }) => {
   const { markDirty, resetDirty, handleCancel: handleClose } = useDirtyCheck(onClose);
+  const sfx = useSFX();
 
   const [name, setNameRaw] = useState('');
   const [color, setColorRaw] = useState(PRESET_COLORS[0]);
@@ -206,7 +208,7 @@ const FactionForm: React.FC<FactionFormProps> = ({
                   {PRESET_COLORS.map((c) => (
                     <Box
                       key={c}
-                      onClick={() => setColor(c)}
+                      onClick={() => { setColor(c); sfx.play('sfx/faction_color'); }}
                       sx={{
                         width: '100%',
                         aspectRatio: '1',

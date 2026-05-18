@@ -242,7 +242,7 @@ export const useWorldStore = create<WorldStore>((set, get) => {
     isDirty: false,
 
     // ── Drawing State ────────────────────────────────────────────────────────
-    drawingTool: 'brush',
+    drawingTool: 'pan',
     drawingColor: '#1a237e',
     activeLayerId: 'territory',
     undoStack: [],

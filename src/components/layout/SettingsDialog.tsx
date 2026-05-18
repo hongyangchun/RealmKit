@@ -21,6 +21,9 @@ import {
   Alert,
   LinearProgress,
   Chip,
+  Slider,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -38,10 +41,18 @@ import AutoModeIcon from '@mui/icons-material/AutoMode';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
+import MusicNoteIcon from '@mui/icons-material/MusicNote';
+import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 import { useWorldStore } from '../../store/worldStore';
 import { useAiConfig } from '../../hooks/useAiConfig';
+import { useAudioStore } from '../../store/audioStore';
 import { importExportService } from '../../services/importExport';
+import { audioManager } from '../../services/audio/AudioManager';
+import { proceduralSFX } from '../../services/audio/ProceduralSFX';
+import { useSFX } from '../../hooks/useSFX';
 import ConfirmDialog from '../common/ConfirmDialog';
 import type { AiConfig } from '../../types';
 
@@ -78,6 +89,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const exportWorld = useWorldStore((s) => s.exportWorld);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sfx = useSFX();
 
   // 世界信息表单
   const [worldName, setWorldName] = useState(worldMeta.name);
@@ -124,6 +136,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const handleSaveWorldInfo = () => {
     if (!worldName.trim()) return;
     setWorldMeta({ name: worldName.trim(), description: worldDesc.trim() });
+    sfx.play('ui/success');
   };
 
   // ── AI 配置保存 ──
@@ -141,16 +154,21 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   };
 
   const handleSaveAi = () => {
-    if (validateAi()) saveAiConfig(aiForm);
+    if (validateAi()) {
+      saveAiConfig(aiForm);
+      sfx.play('ui/success');
+    }
   };
 
   // ── 数据管理 ──
   const handleExport = () => {
     const data = exportWorld();
     importExportService.exportToJson(data);
+    sfx.play('sfx/export');
   };
 
   const handleImportClick = () => {
+    sfx.play('sfx/import');
     fileInputRef.current?.click();
   };
 
@@ -160,6 +178,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     try {
       const data = await importExportService.importFromJson(file);
       importWorld(data);
+      sfx.play('ui/success');
     } catch (err) {
       alert((err as Error).message);
     }
@@ -178,6 +197,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
     { label: 'AI 配置', icon: <SmartToyIcon sx={{ fontSize: 18 }} /> },
     { label: '数据管理', icon: <StorageIcon sx={{ fontSize: 18 }} /> },
     { label: '地图设置', icon: <MapIcon sx={{ fontSize: 18 }} /> },
+    { label: '音频设置', icon: <VolumeUpIcon sx={{ fontSize: 18 }} /> },
     { label: '关于', icon: <InfoIcon sx={{ fontSize: 18 }} /> },
   ];
 
@@ -564,8 +584,11 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
           </Box>
         )}
 
-        {/* ── Tab 4: 关于 ── */}
-        {activeTab === 4 && (
+        {/* ── Tab 4: 音频设置 ── */}
+        {activeTab === 4 && <AudioSettingsPanel />}
+
+        {/* ── Tab 5: 关于 ── */}
+        {activeTab === 5 && (
           <Box sx={{ textAlign: 'center', py: 2 }}>
             <Typography variant="h4" sx={{ fontFamily: "'LXGW WenKai TC', serif", color: '#1a237e', fontWeight: 700, mb: 0.5 }}>
               世界圣典
@@ -648,3 +671,393 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
 };
 
 export default SettingsDialog;
+
+// ─── 音频设置面板（独立子组件）───────────────────────────────────────────
+
+const AudioSettingsPanel: React.FC = () => {
+  const masterVolume = useAudioStore((s) => s.masterVolume);
+  const sfxVolume = useAudioStore((s) => s.sfxVolume);
+  const musicVolume = useAudioStore((s) => s.musicVolume);
+  const ambienceVolume = useAudioStore((s) => s.ambienceVolume);
+  const isMuted = useAudioStore((s) => s.isMuted);
+  const musicEnabled = useAudioStore((s) => s.musicEnabled);
+  const ambienceEnabled = useAudioStore((s) => s.ambienceEnabled);
+  const setMasterVolume = useAudioStore((s) => s.setMasterVolume);
+  const setSfxVolume = useAudioStore((s) => s.setSfxVolume);
+  const setMusicVolume = useAudioStore((s) => s.setMusicVolume);
+  const setAmbienceVolume = useAudioStore((s) => s.setAmbienceVolume);
+  const toggleMute = useAudioStore((s) => s.toggleMute);
+  const toggleMusic = useAudioStore((s) => s.toggleMusic);
+  const toggleAmbience = useAudioStore((s) => s.toggleAmbience);
+
+  const sliderSx = {
+    '& .MuiSlider-thumb': {
+      color: '#1a237e',
+      width: 18,
+      height: 18,
+    },
+    '& .MuiSlider-track': {
+      color: '#1a237e',
+    },
+    '& .MuiSlider-rail': {
+      color: 'rgba(26,35,126,0.2)',
+    },
+  };
+
+  return (
+    <Box>
+      <Typography variant="subtitle2" sx={{ color: '#1a237e', fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <GraphicEqIcon sx={{ fontSize: 18 }} />
+        调整世界的声音氛围
+      </Typography>
+
+      {/* 全局静音 */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2, mb: 3, borderRadius: 2,
+          background: isMuted ? 'rgba(198,40,40,0.08)' : 'rgba(26,35,126,0.05)',
+          border: `1px solid ${isMuted ? 'rgba(198,40,40,0.2)' : 'rgba(26,35,126,0.15)'}`,
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: isMuted ? '#C62828' : '#1a237e' }}>
+              {isMuted ? '🔇 已静音' : '🔊 全局音频'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#888' }}>
+              {isMuted ? '所有声音已关闭' : '控制所有音频的总开关'}
+            </Typography>
+          </Box>
+          <Switch
+            checked={!isMuted}
+            onChange={toggleMute}
+            sx={{
+              '& .MuiSwitch-switchBase.Mui-checked': { color: '#1a237e' },
+              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#1a237e' },
+            }}
+          />
+        </Box>
+      </Paper>
+
+      {/* 主音量 */}
+      <VolumeSlider
+        label="主音量"
+        icon={<VolumeUpIcon sx={{ fontSize: 18, color: '#1a237e' }} />}
+        value={masterVolume}
+        onChange={setMasterVolume}
+        disabled={isMuted}
+        sliderSx={sliderSx}
+      />
+
+      <Divider sx={{ my: 2 }} />
+
+      {/* 音效音量 */}
+      <VolumeSlider
+        label="音效音量"
+        description="按钮、弹窗、交互音效"
+        icon={<VolumeUpIcon sx={{ fontSize: 16, color: '#5D4037' }} />}
+        value={sfxVolume}
+        onChange={setSfxVolume}
+        disabled={isMuted}
+        sliderSx={sliderSx}
+      />
+
+      {/* 音乐音量 */}
+      <Box sx={{ mt: 2.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <MusicNoteIcon sx={{ fontSize: 16, color: '#5D4037' }} />
+            <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a237e' }}>背景音乐</Typography>
+          </Box>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={musicEnabled}
+                onChange={toggleMusic}
+                size="small"
+                disabled={isMuted}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: '#1a237e' },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#1a237e' },
+                }}
+              />
+            }
+            label={<Typography variant="caption" sx={{ color: '#888' }}>{musicEnabled ? '开启' : '关闭'}</Typography>}
+            labelPlacement="start"
+            sx={{ mr: 0 }}
+          />
+        </Box>
+        <Slider
+          value={musicVolume}
+          onChange={(_, v) => setMusicVolume(v as number)}
+          min={0} max={1} step={0.05}
+          disabled={isMuted || !musicEnabled}
+          sx={sliderSx}
+        />
+      </Box>
+
+      {/* 环境声音量 */}
+      <Box sx={{ mt: 2.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <GraphicEqIcon sx={{ fontSize: 16, color: '#5D4037' }} />
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a237e' }}>环境声</Typography>
+              <Typography variant="caption" sx={{ color: '#888' }}>风声、鸟鸣、壁炉等氛围声</Typography>
+            </Box>
+          </Box>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={ambienceEnabled}
+                onChange={toggleAmbience}
+                size="small"
+                disabled={isMuted}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: '#1a237e' },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#1a237e' },
+                }}
+              />
+            }
+            label={<Typography variant="caption" sx={{ color: '#888' }}>{ambienceEnabled ? '开启' : '关闭'}</Typography>}
+            labelPlacement="start"
+            sx={{ mr: 0 }}
+          />
+        </Box>
+        <Slider
+          value={ambienceVolume}
+          onChange={(_, v) => setAmbienceVolume(v as number)}
+          min={0} max={1} step={0.05}
+          disabled={isMuted || !ambienceEnabled}
+          sx={sliderSx}
+        />
+      </Box>
+
+      <Divider sx={{ my: 2.5 }} />
+
+      {/* 音效试听 */}
+      <SFXPreviewPanel />
+
+      <Divider sx={{ my: 2.5 }} />
+
+      <Alert
+        severity="info"
+        sx={{
+          background: 'rgba(26,35,126,0.05)',
+          border: '1px solid rgba(26,35,126,0.15)',
+          '& .MuiAlert-icon': { color: '#1a237e' },
+        }}
+      >
+        <Typography variant="body2">
+          音频设置会自动保存在浏览器中。首次使用时，声音会在您第一次点击页面后激活。
+        </Typography>
+      </Alert>
+    </Box>
+  );
+};
+
+// ─── 音量滑块子组件 ──────────────────────────────────────────────────────
+
+interface VolumeSliderProps {
+  label: string;
+  description?: string;
+  icon: React.ReactNode;
+  value: number;
+  onChange: (v: number) => void;
+  disabled: boolean;
+  sliderSx: object;
+}
+
+const VolumeSlider: React.FC<VolumeSliderProps> = ({
+  label, description, icon, value, onChange, disabled, sliderSx,
+}) => (
+  <Box>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+      {icon}
+      <Box>
+        <Typography variant="body2" sx={{ fontWeight: 500, color: '#1a237e' }}>{label}</Typography>
+        {description && <Typography variant="caption" sx={{ color: '#888' }}>{description}</Typography>}
+      </Box>
+    </Box>
+    <Slider
+      value={value}
+      onChange={(_, v) => onChange(v as number)}
+      min={0} max={1} step={0.05}
+      disabled={disabled}
+      sx={sliderSx}
+    />
+  </Box>
+);
+
+// ─── SFX 音效试听面板 ────────────────────────────────────────────────────
+
+/** SFX 事件的中文名称映射 */
+const SFX_LABELS: Record<string, string> = {
+  'ui/click': '点击',
+  'ui/hover': '悬停',
+  'ui/drawer_open': '抽屉展开',
+  'ui/drawer_close': '抽屉收起',
+  'ui/dialog_open': '弹窗打开',
+  'ui/dialog_close': '弹窗关闭',
+  'ui/tab_switch': '切换标签',
+  'ui/success': '成功',
+  'ui/delete': '删除',
+  'ui/error': '错误',
+  'ui/search_type': '搜索输入',
+  'ui/search_result': '搜索结果',
+  'sfx/card_flip': '卡片翻转',
+  'sfx/card_place': '卡片放置',
+  'sfx/pin_drop': '图钉放下',
+  'sfx/pin_hover': '图钉悬停',
+  'sfx/paint_start': '画笔蘸墨',
+  'sfx/paint_stroke': '画笔描画',
+  'sfx/timeline_scroll': '时间轴滚动',
+  'sfx/event_create': '创建事件',
+  'sfx/event_conflict': '事件冲突',
+  'sfx/graph_node_select': '节点选中',
+  'sfx/graph_link': '关系连线',
+  'sfx/chronicle_scroll': '编年史翻页',
+  'sfx/faction_color': '势力配色',
+  'sfx/import': '导入',
+  'sfx/export': '导出',
+};
+
+const SFXPreviewPanel: React.FC = () => {
+  const [expanded, setExpanded] = useState(false);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [diagInfo, setDiagInfo] = useState({ voices: 0, buffers: 0, ready: false, musicState: 'silence' });
+  const isMuted = useAudioStore((s) => s.isMuted);
+
+  // 刷新诊断信息
+  const refreshDiag = useCallback(() => {
+    setDiagInfo({
+      voices: audioManager.voiceCount,
+      buffers: audioManager.loadedSFXCount,
+      ready: proceduralSFX.isReady,
+      musicState: audioManager.musicState,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (expanded) {
+      refreshDiag();
+      const timer = setInterval(refreshDiag, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [expanded, refreshDiag]);
+
+  const handlePreview = useCallback((eventId: string) => {
+    if (isMuted) return;
+    // 确保 AudioContext 已激活
+    if (!audioManager.isActive) {
+      audioManager.activate();
+    }
+    audioManager.playSFX(eventId);
+    setPlayingId(eventId);
+    setTimeout(() => setPlayingId((prev) => (prev === eventId ? null : prev)), 400);
+  }, [isMuted]);
+
+  const uiEvents = Object.keys(SFX_LABELS).filter((id) => id.startsWith('ui/'));
+  const sfxEvents = Object.keys(SFX_LABELS).filter((id) => id.startsWith('sfx/'));
+
+  const renderGroup = (title: string, events: string[]) => (
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="caption" sx={{ color: '#888', fontWeight: 600, mb: 1, display: 'block' }}>
+        {title}
+      </Typography>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+        {events.map((eventId) => {
+          const isPlaying = playingId === eventId;
+          return (
+            <Chip
+              key={eventId}
+              icon={<PlayArrowIcon sx={{ fontSize: '14px !important' }} />}
+              label={SFX_LABELS[eventId]}
+              size="small"
+              onClick={() => handlePreview(eventId)}
+              sx={{
+                fontFamily: "'LXGW WenKai TC', serif",
+                fontSize: '0.72rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                ...(isPlaying
+                  ? {
+                      backgroundColor: '#1a237e',
+                      color: '#fff',
+                      '& .MuiChip-icon': { color: '#fff' },
+                    }
+                  : {
+                      backgroundColor: 'rgba(26,35,126,0.08)',
+                      color: '#1a237e',
+                      border: '1px solid rgba(26,35,126,0.2)',
+                      '&:hover': {
+                        backgroundColor: 'rgba(26,35,126,0.18)',
+                        borderColor: '#1a237e',
+                      },
+                      '& .MuiChip-icon': { color: '#1a237e' },
+                    }),
+              }}
+            />
+          );
+        })}
+      </Box>
+    </Box>
+  );
+
+  return (
+    <Box>
+      <Button
+        onClick={() => setExpanded(!expanded)}
+        endIcon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+        startIcon={<GraphicEqIcon sx={{ fontSize: 16 }} />}
+        sx={{
+          color: '#1a237e',
+          fontWeight: 600,
+          '&:hover': { background: 'rgba(26,35,126,0.08)' },
+        }}
+      >
+        音效试听
+      </Button>
+
+      <Collapse in={expanded}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2, mt: 1, borderRadius: 2,
+            background: 'rgba(26,35,126,0.03)',
+            border: '1px solid rgba(26,35,126,0.12)',
+          }}
+        >
+          {/* 诊断信息 */}
+          <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+            {[
+              { label: '合成状态', value: diagInfo.ready ? '✅ 就绪' : '⏳ 未初始化' },
+              { label: '已加载音效', value: `${diagInfo.buffers} 个` },
+              { label: '活跃声道', value: `${diagInfo.voices} / 8` },
+              { label: '音乐状态', value: diagInfo.musicState },
+            ].map((item) => (
+              <Box key={item.label} sx={{ display: 'flex', gap: 0.5 }}>
+                <Typography variant="caption" sx={{ color: '#888' }}>{item.label}:</Typography>
+                <Typography variant="caption" sx={{ color: '#1a237e', fontWeight: 500 }}>{item.value}</Typography>
+              </Box>
+            ))}
+          </Box>
+
+          {isMuted && (
+            <Alert severity="warning" sx={{ mb: 2, py: 0.5, '& .MuiAlert-message': { py: 0 } }}>
+              <Typography variant="caption">音频已静音，请先取消静音再试听。</Typography>
+            </Alert>
+          )}
+
+          {renderGroup('✦ 界面音效 (UI)', uiEvents)}
+          {renderGroup('✦ 交互音效 (Interaction)', sfxEvents)}
+
+          <Typography variant="caption" sx={{ color: '#aaa', display: 'block', mt: 1 }}>
+            所有音效和背景音乐由 Web Audio API 实时合成，零外部文件。音乐随页面自动切换。
+          </Typography>
+        </Paper>
+      </Collapse>
+    </Box>
+  );
+};

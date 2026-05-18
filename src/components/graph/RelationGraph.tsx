@@ -3,10 +3,13 @@
  * 使用 react-force-graph-2d 渲染
  */
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, keyframes } from '@mui/material';
 import ForceGraph2D from 'react-force-graph-2d';
 import type { GraphData } from 'force-graph';
 import { useWorldStore } from '../../store/worldStore';
+import { RELATION_COLORS } from '../../constants/relationTypes';
+import { relationStyle } from '../../theme/narrativeTokens';
+import { useSFX } from '../../hooks/useSFX';
 import GraphControls from './GraphControls';
 
 interface RelationGraphProps {
@@ -45,6 +48,7 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
   const characters = useWorldStore((s) => s.data.characters);
   const factions = useWorldStore((s) => s.data.factions);
   const relations = useWorldStore((s) => s.data.relations);
+  const sfx = useSFX();
 
   const { searchText = '', onVisibleCountChange } = props;
 
@@ -181,6 +185,22 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
     return neighbors;
   }, [selectedNodeId, graphData]);
 
+  // ── 叙事连线视觉映射 ──
+  // 根据关系类型映射连线颜色
+  const getRelationColor = useCallback((type: string): string => {
+    return RELATION_COLORS[type as keyof typeof RELATION_COLORS] ?? 'rgba(100,100,100,0.3)';
+  }, []);
+
+  // 判断关系是否为"敌对"类型
+  const isHostile = useCallback((type: string): boolean => {
+    return ['宿敌', '背叛者', '对手'].includes(type);
+  }, []);
+
+  // 判断关系是否为"亲密"类型
+  const isIntimate = useCallback((type: string): boolean => {
+    return ['亲人', '家族', '恋人', '挚友'].includes(type);
+  }, []);
+
   if (characters.length === 0) {
     return (
       <Box sx={{
@@ -209,28 +229,52 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
         onRelationTypeToggle={handleRelationTypeToggle}
       />
 
-      {/* Hover info */}
+      {/* Hover info — 叙事化人物气泡 */}
       {hoverNode && (
         <Box sx={{
           position: 'absolute',
           top: 16,
           left: 16,
           background: 'rgba(255,255,255,0.95)',
-          borderRadius: 1,
+          borderRadius: 2,
           p: 1.5,
           zIndex: 10,
-          boxShadow: 2,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          borderLeft: `3px solid ${hoverNode.factionColor}`,
+          maxWidth: 220,
         }}>
-          <Typography variant="subtitle2" fontWeight={700}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ color: hoverNode.factionColor }}>
             {hoverNode.name}
           </Typography>
           {hoverNode.avatar && (
-            <img
-              src={hoverNode.avatar}
-              alt={hoverNode.name}
-              style={{ width: 40, height: 40, borderRadius: '50%' }}
-            />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+              <img
+                src={hoverNode.avatar}
+                alt={hoverNode.name}
+                style={{ width: 36, height: 36, borderRadius: '50%', border: `2px solid ${hoverNode.factionColor}` }}
+              />
+            </Box>
           )}
+          {/* 显示与选中节点的关系 */}
+          {selectedNodeId && selectedNodeId !== hoverNode.id && (() => {
+            const rel = relations.find(r =>
+              (r.sourceId === selectedNodeId && r.targetId === hoverNode.id) ||
+              (r.targetId === selectedNodeId && r.sourceId === hoverNode.id)
+            );
+            if (!rel) return null;
+            return (
+              <Box sx={{ mt: 0.5, pt: 0.5, borderTop: '1px dashed rgba(0,0,0,0.1)' }}>
+                <Typography variant="caption" sx={{ color: getRelationColor(rel.type), fontWeight: 600 }}>
+                  {rel.type}
+                </Typography>
+                {rel.description && (
+                  <Typography variant="caption" sx={{ display: 'block', color: '#666', mt: 0.25, fontSize: '0.65rem' }}>
+                    {rel.description}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })()}
         </Box>
       )}
 
@@ -294,25 +338,56 @@ const RelationGraph: React.FC<RelationGraphProps> = (props) => {
         }}
         linkLabel={(link) => {
           const l = link as unknown as GraphLink;
-          return l.type;
+          return l.description ? `${l.type}: ${l.description}` : l.type;
         }}
         linkDirectionalArrowLength={4}
         linkColor={(link) => {
-          if (!selectedNodeId) return 'rgba(100,100,100,0.3)';
-          const srcId = typeof link.source === 'string' ? link.source : (link.source as ForceGraphNode).id;
-          const tgtId = typeof link.target === 'string' ? link.target : (link.target as ForceGraphNode).id;
-          if (srcId === selectedNodeId || tgtId === selectedNodeId) return 'rgba(26,35,126,0.7)';
-          return 'rgba(100,100,100,0.08)';
+          const l = link as unknown as GraphLink;
+          const type = l.type;
+
+          // 选中节点时高亮相关连线
+          if (selectedNodeId) {
+            const srcId = typeof l.source === 'string' ? l.source : (l.source as ForceGraphNode).id;
+            const tgtId = typeof l.target === 'string' ? l.target : (l.target as ForceGraphNode).id;
+            if (srcId === selectedNodeId || tgtId === selectedNodeId) {
+              return getRelationColor(type);
+            }
+            return 'rgba(100,100,100,0.06)';
+          }
+
+          // 无选中节点时按类型着色，保持半透明
+          const baseColor = getRelationColor(type);
+          return baseColor + '80'; // 50% 透明度
         }}
         linkWidth={(link) => {
-          if (!selectedNodeId) return 1;
-          const srcId = typeof link.source === 'string' ? link.source : (link.source as ForceGraphNode).id;
-          const tgtId = typeof link.target === 'string' ? link.target : (link.target as ForceGraphNode).id;
-          if (srcId === selectedNodeId || tgtId === selectedNodeId) return 2.5;
-          return 0.5;
+          const l = link as unknown as GraphLink;
+          const type = l.type;
+
+          if (selectedNodeId) {
+            const srcId = typeof l.source === 'string' ? l.source : (l.source as ForceGraphNode).id;
+            const tgtId = typeof l.target === 'string' ? l.target : (l.target as ForceGraphNode).id;
+            if (srcId === selectedNodeId || tgtId === selectedNodeId) {
+              // 亲密关系更粗
+              return isIntimate(type) ? 3 : 2;
+            }
+            return 0.3;
+          }
+
+          // 默认：亲密关系稍粗
+          return isIntimate(type) ? 1.8 : 1;
+        }}
+        linkLineDash={(link) => {
+          const l = link as unknown as GraphLink;
+          const type = l.type;
+          // 敌对关系用虚线
+          if (isHostile(type)) return [6, 3];
+          // 师徒关系用点线
+          if (type === '师徒') return [2, 4];
+          return null;
         }}
         onNodeClick={(node) => {
           const n = node as unknown as ForceGraphNode;
+          sfx.play('sfx/graph_node_select');
           if (selectedNodeId === n.id) {
             handleNodeSelect(null);
           } else {

@@ -14,6 +14,7 @@ import {
   Button,
   IconButton,
   Tooltip,
+  keyframes,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
@@ -23,8 +24,32 @@ import ReadOnlyMapPreview from '../components/dashboard/ReadOnlyMapPreview';
 import FactionOverviewCard from '../components/dashboard/FactionOverviewCard';
 import WorldSeedWizard from '../components/dashboard/WorldSeedWizard';
 import CanvasErrorBoundary from '../components/common/CanvasErrorBoundary';
+import StoryEmptyState from '../components/common/StoryEmptyState';
 import { useWorldStore } from '../store/worldStore';
+import { reducedMotionOverride } from '../theme/transitions';
 import type { WorldSeedResult } from '../types';
+
+// ─── Hero 呼吸动画 ──────────────────────────────────────────
+
+/** 背景渐变呼吸 — 深蓝 ↔ 稍浅蓝缓慢交替 */
+const heroBreathe = keyframes`
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+`;
+
+/** 世界名称发光脉冲 */
+const nameGlow = keyframes`
+  0%, 100% {
+    text-shadow: 0 0 4px rgba(255,213,79,0.2);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(255,213,79,0.35), 0 0 3px rgba(255,213,79,0.1);
+  }
+`;
 
 // ─── 可点击 Section 标题 ──────────────────────────────────────────────────────
 
@@ -106,90 +131,40 @@ const DashboardPage: React.FC = () => {
   // ═══ 空世界引导 ═══
   if (isWorldEmpty) {
     return (
-      <Box
-        sx={{
-          width: '100%',
-          height: 'calc(100vh - 64px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(135deg, #1a3a5c 0%, #0d1b2a 100%)',
-          position: 'relative',
-        }}
-      >
-        <Card
-          sx={{
-            maxWidth: 520,
-            width: '90%',
-            background: 'linear-gradient(135deg, #1a237e 0%, #3949ab 100%)',
-            borderRadius: 4,
-            overflow: 'hidden',
-            position: 'relative',
-          }}
+      <>
+        <StoryEmptyState
+          scene="dashboard"
+          fullScreen
+          onAction={() => setWizardOpen(true)}
+          actionLabel="点亮第一颗星"
         >
-          <CardContent sx={{ position: 'relative', zIndex: 1, py: 5, textAlign: 'center' }}>
-            <Typography variant="h3" sx={{ fontFamily: "'LXGW WenKai TC', serif", fontWeight: 700, color: '#ffd54f', mb: 0.5 }}>
-              📖 {meta.name}
-            </Typography>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)', mb: 3, fontSize: '0.9rem' }}>
-              {meta.description || '这个世界还是一片空白'}
-            </Typography>
-            <Typography variant="h5" sx={{ fontFamily: "'LXGW WenKai TC', serif", fontWeight: 700, color: '#ffd54f', mb: 1 }}>
-              🚀 欢迎来到你的世界！
-            </Typography>
-            <Typography sx={{ color: 'rgba(255,255,255,0.9)', mb: 3, maxWidth: 420, mx: 'auto' }}>
-              用几步简单的选择，让世界自动诞生——然后你再来塑造它的命运。
-            </Typography>
-            <Button
-              startIcon={<AutoAwesomeIcon />}
-              onClick={() => setWizardOpen(true)}
-              variant="contained"
-              sx={{
-                backgroundColor: '#ffd54f',
-                color: '#1a237e',
-                fontWeight: 800,
-                fontSize: '1.05rem',
-                px: 4,
-                py: 1.5,
-                borderRadius: 2,
-                '&:hover': { backgroundColor: '#ffca28' },
-                boxShadow: '0 4px 14px rgba(255,213,79,0.4)',
-              }}
-            >
-              立即创建我的世界
-            </Button>
-          </CardContent>
-          <Box sx={{ position: 'absolute', right: 20, bottom: 10, fontSize: '10rem', opacity: 0.08, color: '#ffd54f', userSelect: 'none' }}>
-            🌍
-          </Box>
-        </Card>
-
-        {/* 新建世界按钮浮在右上角 */}
-        <Button
-          size="small"
-          startIcon={<AutoAwesomeIcon />}
-          onClick={() => setWizardOpen(true)}
-          sx={{
-            position: 'absolute',
-            top: 12,
-            right: 12,
-            zIndex: 10,
-            backgroundColor: '#ffd54f',
-            color: '#1a237e',
-            fontWeight: 700,
-            '&:hover': { backgroundColor: '#ffca28' },
-            borderRadius: 2,
-            px: 1.5,
-            py: 0.5,
-            fontSize: '0.8rem',
-          }}
-        >
-          新建世界
-        </Button>
+          {/* 新建世界按钮浮在右上角 */}
+          <Button
+            size="small"
+            startIcon={<AutoAwesomeIcon />}
+            onClick={() => setWizardOpen(true)}
+            sx={{
+              position: 'fixed',
+              top: 76,
+              right: 12,
+              zIndex: 10,
+              backgroundColor: '#ffd54f',
+              color: '#1a237e',
+              fontWeight: 700,
+              '&:hover': { backgroundColor: '#ffca28' },
+              borderRadius: 2,
+              px: 1.5,
+              py: 0.5,
+              fontSize: '0.8rem',
+            }}
+          >
+            新建世界
+          </Button>
+        </StoryEmptyState>
 
         {/* 世界种子向导弹窗 */}
         <WorldSeedWizard open={wizardOpen} onClose={() => setWizardOpen(false)} onGenerate={handleGenerate} />
-      </Box>
+      </>
     );
   }
 
@@ -210,11 +185,14 @@ const DashboardPage: React.FC = () => {
         {/* ═══ Hero 横幅 ═══ */}
         <Card
           sx={{
-            background: 'linear-gradient(135deg, #1a237e 0%, #283593 100%)',
+            background: 'linear-gradient(135deg, #1a237e 0%, #283593 40%, #1a237e 70%, #283593 100%)',
+            backgroundSize: '200% 200%',
+            animation: `${heroBreathe} 8s ease-in-out infinite`,
             borderRadius: 3,
             position: 'relative',
             overflow: 'hidden',
             mb: 2.5,
+            ...reducedMotionOverride,
           }}
         >
           <Box
@@ -246,6 +224,8 @@ const DashboardPage: React.FC = () => {
                     color: '#ffd54f',
                     whiteSpace: 'nowrap',
                     transition: 'text-decoration 0.2s',
+                    animation: `${nameGlow} 4s ease-in-out infinite`,
+                    ...reducedMotionOverride,
                   }}
                 >
                   🌍 {meta.name}

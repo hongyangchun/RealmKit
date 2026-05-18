@@ -6,6 +6,7 @@
 import React, { useRef, useEffect, useCallback, useState, useImperativeHandle, forwardRef } from 'react';
 import { Box } from '@mui/material';
 import { useWorldStore } from '../../store/worldStore';
+import { audioManager } from '../../services/audio/AudioManager';
 import type { MapLayer, GridCell, LayerId, Faction, City, HistoryEvent } from '../../types';
 
 /**
@@ -611,6 +612,7 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
 
       if (effectiveTool === 'brush') {
         paintCell(cell.x, cell.y);
+        audioManager.playSFX('sfx/paint_start');
       } else if (effectiveTool === 'eraser') {
         eraseCell(cell.x, cell.y);
       }
@@ -678,6 +680,7 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
 
       if (effectiveTool === 'brush') {
         paintCell(cell.x, cell.y);
+        audioManager.playSFX('sfx/paint_stroke');
       } else if (effectiveTool === 'eraser') {
         eraseCell(cell.x, cell.y);
       }

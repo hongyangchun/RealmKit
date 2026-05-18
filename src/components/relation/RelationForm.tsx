@@ -19,6 +19,7 @@ import type { Relation } from '../../types';
 import { RELATION_TYPES, RELATION_COLORS } from '../../constants/relationTypes';
 import { useWorldStore } from '../../store/worldStore';
 import { useDirtyCheck } from '../../hooks/useDirtyCheck';
+import { useSFX } from '../../hooks/useSFX';
 
 interface RelationFormProps {
   open: boolean;
@@ -36,8 +37,8 @@ const RelationForm: React.FC<RelationFormProps> = ({
   defaultSourceId,
 }) => {
   const characters = useWorldStore((s) => s.data.characters);
-
   const { markDirty, resetDirty, handleCancel: handleClose } = useDirtyCheck(onClose);
+  const sfx = useSFX();
 
   const [sourceId, setSourceIdRaw] = useState('');
   const [targetId, setTargetIdRaw] = useState('');
@@ -77,10 +78,14 @@ const RelationForm: React.FC<RelationFormProps> = ({
       type: relationType,
       description: description.trim() || undefined,
     });
+    sfx.play('sfx/graph_link');
     resetDirty();
   };
 
   const isValid = sourceId && targetId && sourceId !== targetId;
+
+  /** 高 z-index 确保下拉菜单不被浮层/Modal 遮挡 */
+  const selectMenuProps = { sx: { zIndex: 10001 }, disablePortal: false };
 
   return (
     <Dialog
@@ -122,6 +127,7 @@ const RelationForm: React.FC<RelationFormProps> = ({
             fullWidth
             size="small"
             sx={{ mb: 2 }}
+            SelectProps={{ MenuProps: selectMenuProps }}
           >
             <MenuItem value="">请选择</MenuItem>
             {characters.map((c) => (
@@ -145,6 +151,7 @@ const RelationForm: React.FC<RelationFormProps> = ({
             fullWidth
             size="small"
             sx={{ mb: 2 }}
+            SelectProps={{ MenuProps: selectMenuProps }}
           >
             <MenuItem value="">请选择</MenuItem>
             {characters.map((c) => (
@@ -162,6 +169,7 @@ const RelationForm: React.FC<RelationFormProps> = ({
             fullWidth
             size="small"
             sx={{ mb: 2 }}
+            SelectProps={{ MenuProps: selectMenuProps }}
           >
             {RELATION_TYPES.map((type) => (
               <MenuItem key={type} value={type}>
