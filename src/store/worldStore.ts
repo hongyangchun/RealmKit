@@ -24,6 +24,7 @@ import type {
 } from '../types';
 import { storageAdapter } from '../services/storageAdapter';
 import { conflictDetector } from '../services/conflictDetector';
+import { syncService } from '../services/syncService';
 import { generateAvatar } from '../components/character/AvatarGenerator';
 
 // ─── Default Data ─────────────────────────────────────────────────────────────
@@ -151,6 +152,7 @@ function persist(data: WorldData): ConflictWarning[] {
     meta: { ...data.meta, updatedAt: new Date().toISOString() },
   };
   storageAdapter.save(updated);
+  syncService.syncWorld(updated);       // 后台异步同步到 D1（已认证时）
   return conflictDetector.detect(updated);
 }
 

@@ -323,3 +323,16 @@ export interface StorySeedData {
   eventType: 'death_violation' | 'location_conflict';
   suggestions: string[];
 }
+
+// =============================================================================
+// 全量备份类型定义（跨设备迁移）
+// =============================================================================
+
+/** 全量备份数据包（version=2 格式） */
+export interface FullBackup {
+  version: 2;
+  exportedAt: string;
+  world: WorldData;
+  aiConfig?: AiConfig;
+  chronicles?: ChronicleEntry[];
+}

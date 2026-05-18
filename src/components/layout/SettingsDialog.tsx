@@ -46,10 +46,25 @@ import MusicNoteIcon from '@mui/icons-material/MusicNote';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
+import {
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+} from '@mui/material';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import SaveAltIcon from '@mui/icons-material/SaveAlt';
+import CloudSyncIcon from '@mui/icons-material/CloudSync';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import CloudOffIcon from '@mui/icons-material/CloudOff';
+
 import { useWorldStore } from '../../store/worldStore';
 import { useAiConfig } from '../../hooks/useAiConfig';
 import { useAudioStore } from '../../store/audioStore';
 import { importExportService } from '../../services/importExport';
+import { syncService } from '../../services/syncService';
+import { markBackupTime, shouldRemindBackup, formatLastBackupTime, getDaysSinceLastBackup } from '../../services/backupTracker';
 import { audioManager } from '../../services/audio/AudioManager';
 import { proceduralSFX } from '../../services/audio/ProceduralSFX';
 import { useSFX } from '../../hooks/useSFX';
@@ -104,6 +119,9 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [clearAiConfirmOpen, setClearAiConfirmOpen] = useState(false);
   const [storageInfo, setStorageInfo] = useState({ used: 0, total: 5 * 1024 * 1024 });
+  const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
 
   // 同步 initialTab
   useEffect(() => {
@@ -161,9 +179,19 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   };
 
   // ── 数据管理 ──
-  const handleExport = () => {
+  const handleExportWorld = () => {
     const data = exportWorld();
     importExportService.exportToJson(data);
+    markBackupTime();
+    setExportMenuAnchor(null);
+    sfx.play('sfx/export');
+  };
+
+  const handleExportFullBackup = () => {
+    const data = exportWorld();
+    importExportService.exportFullBackup(data);
+    markBackupTime();
+    setExportMenuAnchor(null);
     sfx.play('sfx/export');
   };
 
@@ -175,14 +203,27 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // 弹出确认对话框
+    setPendingImportFile(file);
+    setImportConfirmOpen(true);
+    e.target.value = '';
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImportFile) return;
     try {
-      const data = await importExportService.importFromJson(file);
-      importWorld(data);
+      const result = await importExportService.importFromFile(pendingImportFile);
+      importWorld(result.world);
+      // 恢复附加数据
+      importExportService.restoreExtras(result);
       sfx.play('ui/success');
     } catch (err) {
       alert((err as Error).message);
     }
-    e.target.value = '';
+    setImportConfirmOpen(false);
+    setPendingImportFile(null);
+    // 刷新页面以加载恢复的 AI 配置和编年史
+    window.location.reload();
   };
 
   const formatBytes = (bytes: number): string => {
@@ -483,11 +524,82 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
               </Box>
             </Paper>
 
+            {/* 备份提醒 */}
+            {shouldRemindBackup() && (
+              <Alert severity="warning" sx={{ mb: 2, background: 'rgba(255,152,0,0.1)', border: '1px solid rgba(255,152,0,0.3)', '& .MuiAlert-icon': { color: '#E65100' } }}>
+                <Typography variant="body2">
+                  您的世界数据已超过 {getDaysSinceLastBackup()} 天未备份。换电脑或清除浏览器数据会导致丢失，建议立即导出备份。
+                </Typography>
+              </Alert>
+            )}
+
+            {/* 云同步状态 */}
+            <Paper elevation={0} sx={{ p: 2, mb: 3, background: 'rgba(26,35,126,0.05)', borderRadius: 2, border: '1px solid rgba(26,35,126,0.15)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: '#1a237e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {syncService.isAuthenticated()
+                    ? <><CloudDoneIcon sx={{ fontSize: 18 }} /> 云同步</>
+                    : <><CloudOffIcon sx={{ fontSize: 18 }} /> 云同步</>
+                  }
+                </Typography>
+                {syncService.isAuthenticated() && (
+                  <Chip
+                    label="已连接"
+                    size="small"
+                    color="success"
+                    variant="outlined"
+                    sx={{ fontSize: '0.7rem', height: 22 }}
+                  />
+                )}
+              </Box>
+              {syncService.isAuthenticated() ? (
+                <>
+                  <Typography variant="body2" sx={{ color: '#5D4037', mb: 1 }}>
+                    数据变更后自动同步到云端，换设备登录即可恢复。
+                  </Typography>
+                  {syncService.getLastSyncAt() && (
+                    <Typography variant="caption" sx={{ color: '#888', display: 'block', mb: 1 }}>
+                      上次同步：{new Date(syncService.getLastSyncAt()!).toLocaleString('zh-CN')}
+                    </Typography>
+                  )}
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<CloudSyncIcon sx={{ fontSize: 16 }} />}
+                      onClick={async () => {
+                        const data = useWorldStore.getState().data;
+                        await syncService.forceSyncWorld(data);
+                        refreshStorageInfo();
+                      }}
+                      sx={{
+                        fontSize: '0.75rem',
+                        borderColor: 'rgba(26,35,126,0.4)',
+                        color: '#1a237e',
+                        '&:hover': { borderColor: '#1a237e', background: 'rgba(26,35,126,0.08)' },
+                      }}
+                    >
+                      立即同步
+                    </Button>
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <Typography variant="body2" sx={{ color: '#888', mb: 1 }}>
+                    未连接云端。通过 Cloudflare Access 登录后可启用自动同步。
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#aaa' }}>
+                    数据仍安全保存在本地浏览器中。
+                  </Typography>
+                </>
+              )}
+            </Paper>
+
             {/* 导入导出 */}
             <Typography variant="subtitle2" sx={{ color: '#1a237e', fontWeight: 600, mb: 1.5 }}>
               导入 / 导出
             </Typography>
-            <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+            <Box sx={{ display: 'flex', gap: 2, mb: 1.5 }}>
               <Button
                 variant="outlined"
                 startIcon={<FileUploadIcon />}
@@ -499,21 +611,61 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   '&:hover': { borderColor: '#1a237e', background: 'rgba(26,35,126,0.05)' },
                 }}
               >
-                导入世界数据
+                导入数据
               </Button>
-              <Button
-                variant="outlined"
-                startIcon={<FileDownloadIcon />}
-                onClick={handleExport}
-                fullWidth
-                sx={{
-                  borderColor: 'rgba(26,35,126,0.5)',
-                  color: '#1a237e',
-                  '&:hover': { borderColor: '#1a237e', background: 'rgba(26,35,126,0.05)' },
-                }}
-              >
-                导出世界数据
-              </Button>
+              <Box sx={{ position: 'relative', flex: 1 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<FileDownloadIcon />}
+                  endIcon={<ArrowDropDownIcon />}
+                  onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+                  fullWidth
+                  sx={{
+                    borderColor: 'rgba(26,35,126,0.5)',
+                    color: '#1a237e',
+                    '&:hover': { borderColor: '#1a237e', background: 'rgba(26,35,126,0.05)' },
+                  }}
+                >
+                  导出数据
+                </Button>
+                <Menu
+                  anchorEl={exportMenuAnchor}
+                  open={Boolean(exportMenuAnchor)}
+                  onClose={() => setExportMenuAnchor(null)}
+                  PaperProps={{
+                    sx: { borderRadius: 2, border: '1px solid rgba(26,35,126,0.15)', minWidth: 200 },
+                  }}
+                >
+                  <MenuItem onClick={handleExportFullBackup}>
+                    <ListItemIcon><CloudDownloadIcon sx={{ color: '#1a237e', fontSize: 20 }} /></ListItemIcon>
+                    <ListItemText
+                      primary="完整备份（推荐）"
+                      primaryTypographyProps={{ fontSize: '0.85rem', fontWeight: 600 }}
+                      secondary="世界数据 + AI 配置 + 编年史"
+                      secondaryTypographyProps={{ fontSize: '0.72rem' }}
+                    />
+                  </MenuItem>
+                  <MenuItem onClick={handleExportWorld}>
+                    <ListItemIcon><SaveAltIcon sx={{ color: '#5D4037', fontSize: 20 }} /></ListItemIcon>
+                    <ListItemText
+                      primary="仅世界数据"
+                      primaryTypographyProps={{ fontSize: '0.85rem' }}
+                      secondary="势力/人物/地图/事件"
+                      secondaryTypographyProps={{ fontSize: '0.72rem' }}
+                    />
+                  </MenuItem>
+                </Menu>
+              </Box>
+            </Box>
+
+            {/* 备份时间信息 */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
+              <Typography variant="caption" sx={{ color: '#888' }}>
+                上次备份：{formatLastBackupTime()}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#aaa' }}>
+                · 支持拖拽 JSON 文件到页面直接导入
+              </Typography>
             </Box>
             <input ref={fileInputRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
 
@@ -636,6 +788,21 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
           </Button>
         )}
       </DialogActions>
+
+      {/* 导入确认对话框 */}
+      <ConfirmDialog
+        open={importConfirmOpen}
+        title="确认导入数据？"
+        message="导入将覆盖当前所有世界数据。建议先导出备份后再导入。"
+        confirmLabel="确认导入"
+        cancelLabel="取消"
+        severity="warning"
+        onConfirm={handleConfirmImport}
+        onCancel={() => {
+          setImportConfirmOpen(false);
+          setPendingImportFile(null);
+        }}
+      />
 
       {/* 确认对话框 */}
       <ConfirmDialog

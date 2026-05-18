@@ -428,7 +428,24 @@ const MarkerDetailDialog: React.FC<MarkerDetailDialogProps> = ({ marker, onClose
         </IconButton>
       </DialogTitle>
       <DialogContent sx={{ pt: 1 }}>
-        <Box sx={{ mt: 0.5 }}>{content}</Box>
+        <Box
+          sx={{
+            mt: 0.5,
+            // 让 MUI 子组件在深蓝背景上清晰可读
+            '& .MuiChip-root': {
+              color: 'rgba(255,255,255,0.9)',
+              borderColor: 'rgba(255,255,255,0.35)',
+              '&.MuiChip-outlined': {
+                borderColor: 'rgba(255,255,255,0.35)',
+              },
+            },
+            '& .MuiDivider-root': {
+              borderColor: 'rgba(255,255,255,0.15)',
+            },
+          }}
+        >
+          {content}
+        </Box>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button

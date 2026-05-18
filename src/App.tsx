@@ -1,9 +1,10 @@
 /**
  * App.tsx - 根组件
- * 路由配置 + AppShell 布局集成
+ * 路由配置 + SyncLoader 云同步加载 + AppShell 布局集成
  */
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import SyncLoader from './components/layout/SyncLoader';
 import AppShell from './components/layout/AppShell';
 import DashboardPage from './pages/DashboardPage';
 import MapPage from './pages/MapPage';
@@ -14,17 +15,19 @@ import ChroniclePage from './pages/ChroniclePage';
 
 const App: React.FC = () => {
   return (
-    <AppShell>
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/map" element={<MapPage />} />
-        <Route path="/factions" element={<FactionCityPage />} />
-        <Route path="/cities" element={<Navigate to="/factions" replace />} />
-        <Route path="/characters" element={<CharacterPage />} />
-        <Route path="/timeline" element={<TimelinePage />} />
-        <Route path="/chronicle" element={<ChroniclePage />} />
-      </Routes>
-    </AppShell>
+    <SyncLoader>
+      <AppShell>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/map" element={<MapPage />} />
+          <Route path="/factions" element={<FactionCityPage />} />
+          <Route path="/cities" element={<Navigate to="/factions" replace />} />
+          <Route path="/characters" element={<CharacterPage />} />
+          <Route path="/timeline" element={<TimelinePage />} />
+          <Route path="/chronicle" element={<ChroniclePage />} />
+        </Routes>
+      </AppShell>
+    </SyncLoader>
   );
 };
 

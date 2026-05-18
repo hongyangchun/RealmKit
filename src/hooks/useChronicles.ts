@@ -6,6 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { v4 as uuid } from 'uuid';
 import type { ChronicleEntry } from '../types';
+import { syncService } from '../services/syncService';
 
 const STORAGE_KEY = 'zzworld_chronicles';
 
@@ -40,6 +41,7 @@ function loadChronicles(): ChronicleEntry[] {
 function saveChronicles(entries: ChronicleEntry[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    syncService.syncChronicles(entries);  // 后台异步同步到 D1（已认证时）
   } catch {
     console.warn('[useChronicles] Failed to save to localStorage');
   }
