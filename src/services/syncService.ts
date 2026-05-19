@@ -152,11 +152,25 @@ class SyncService {
       if (cloud.chronicles) {
         const localChronicles = this.loadLocalChronicles();
         const cloudChroniclesUpdatedAt = cloud.chronicles.updatedAt;
-        const localChroniclesStr = localStorage.getItem('zzworld_chronicles') ?? '';
 
-        // 简单比较：如果云端有数据但本地没有，或云端更新
-        if (!localChroniclesStr || cloudChroniclesUpdatedAt > localChroniclesStr) {
+        if (localChronicles.length === 0) {
+          // 本地无编年史，直接用云端
+          console.log('[SyncService] 本地无编年史，从云端恢复');
           result.chronicles = cloud.chronicles.data;
+        } else {
+          // 两边都有，比较条目数量决定策略（编年史没有精确的 updatedAt）
+          // 安全策略：合并去重，而非覆盖
+          console.log(`[SyncService] 本地 ${localChronicles.length} 条，云端 ${cloud.chronicles.data.length} 条编年史`);
+          // 使用合并策略：以本地为主，补充云端中本地没有的条目
+          const localIds = new Set(localChronicles.map((c: ChronicleEntry) => c.id));
+          const merged = [
+            ...localChronicles,
+            ...cloud.chronicles.data.filter((c: ChronicleEntry) => !localIds.has(c.id)),
+          ];
+          if (merged.length !== localChronicles.length) {
+            console.log(`[SyncService] 合并编年史：本地 ${localChronicles.length} + 新增 ${merged.length - localChronicles.length} 条`);
+            result.chronicles = merged;
+          }
         }
       }
 

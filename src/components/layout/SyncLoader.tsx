@@ -37,20 +37,37 @@ const SyncLoader: React.FC<SyncLoaderProps> = ({ children }) => {
       setSyncState('syncing');
 
       try {
-        // 读取本地数据
+        // 读取本地数据（记录快照时间戳）
         const localWorld = storageAdapter.load();
+        const localSnapshotUpdatedAt = localWorld?.meta?.updatedAt ?? '';
 
         // 执行初始同步（合并 D1 数据）
         const result = await syncService.initialSync(localWorld);
 
         if (cancelled) return;
 
-        // 如果有云端数据需要写入 store
+        // 二次校验：同步期间本地数据可能被其他进程修改
+        // 重新读取 localStorage 最新状态，避免用旧云端数据覆盖新本地数据
         if (result.world) {
-          // 写入 localStorage（保持一致性）
-          storageAdapter.save(result.world);
-          // 更新 Zustand store
-          importWorld(result.world);
+          const latestLocal = storageAdapter.load();
+          const latestUpdatedAt = latestLocal?.meta?.updatedAt ?? '';
+
+          if (latestUpdatedAt > localSnapshotUpdatedAt) {
+            // 本地数据在同步等待期间被修改了（理论上不应发生，但做防护）
+            console.warn(
+              '[SyncLoader] 本地数据在同步期间被修改，跳过云端覆盖',
+              { before: localSnapshotUpdatedAt, after: latestUpdatedAt }
+            );
+            // 以本地最新数据为准，推送到云端
+            if (latestLocal) {
+              syncService.syncWorld(latestLocal);
+            }
+          } else {
+            // 正常：本地无变化，用云端数据覆盖
+            console.log('[SyncLoader] 使用云端数据更新本地');
+            storageAdapter.save(result.world);
+            importWorld(result.world);
+          }
         }
 
         // 如果有云端编年史需要写入
