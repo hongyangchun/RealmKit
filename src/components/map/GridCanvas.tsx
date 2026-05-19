@@ -333,6 +333,15 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
     ctx.translate(pan.x, pan.y);
     ctx.scale(zoom, zoom);
 
+    // Grid area background — distinct from canvas background so boundary is clear
+    ctx.fillStyle = '#faf3e0';
+    ctx.fillRect(0, 0, grid.width * effectiveCellSize, grid.height * effectiveCellSize);
+
+    // Grid border
+    ctx.strokeStyle = '#5D4037';
+    ctx.lineWidth = 1.5 / zoom;
+    ctx.strokeRect(0, 0, grid.width * effectiveCellSize, grid.height * effectiveCellSize);
+
     // Grid lines
     ctx.strokeStyle = 'rgba(100, 100, 100, 0.15)';
     ctx.lineWidth = 0.5 / zoom; // keep constant visual thickness
