@@ -62,7 +62,7 @@ export interface GridCanvasHandle {
   /** 从屏幕坐标反算网格坐标 */
   hitTest: (clientX: number, clientY: number) => { x: number; y: number } | null;
   /** 获取当前平移、缩放、有效格子大小 */
-  getPanZoom: () => { panX: number; panY: number; zoom: number; effectiveCellSize: number };
+  getPanZoom: () => { panX: number; panY: number; zoom: number; effectiveCellSize: number; effectiveCellSizeX: number; effectiveCellSizeY: number };
 }
 
 interface GridCanvasProps {
@@ -71,8 +71,8 @@ interface GridCanvasProps {
   onSizeChange?: (width: number, height: number) => void;
   /** 点击画布时触发（pan/pin/city 工具下），返回屏幕坐标 */
   onCanvasClick?: (clientX: number, clientY: number) => void;
-  /** Canvas 重绘后通知父组件平移/缩放状态 */
-  onPanZoomChange?: (panX: number, panY: number, zoom: number, effectiveCellSize: number) => void;
+  /** Canvas 重绘后通知父组件平移/缩放状态（effectiveCellSizeX/Y 分别对应 X/Y 方向格子像素大小） */
+  onPanZoomChange?: (panX: number, panY: number, zoom: number, effectiveCellSize: number, effectiveCellSizeY?: number) => void;
   /** 鼠标 hover 到势力领地上时触发，factionId 为 null 表示离开领地 */
   onHoverFaction?: (factionId: string | null, screenX: number, screenY: number) => void;
   /** 只读模式：禁止绘制/擦除/放置图钉/放置城市，强制使用平移模式 */
@@ -160,13 +160,17 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
       const grid = mapGrid ?? { width: 0, height: 0 };
       const logicalW = grid.width * cellSize;
       const logicalH = grid.height * cellSize;
-      const baseScale = Math.min(width / (logicalW || 1), height / (logicalH || 1));
-      const effectiveCellSize = cellSize * baseScale;
+      const scaleX = width / (logicalW || 1);
+      const scaleY = height / (logicalH || 1);
+      const effectiveCellSizeX = cellSize * scaleX;
+      const effectiveCellSizeY = cellSize * scaleY;
       return {
         panX: panRef.current.x,
         panY: panRef.current.y,
         zoom: zoomRef.current,
-        effectiveCellSize,
+        effectiveCellSize: effectiveCellSizeX, // 兼容旧接口
+        effectiveCellSizeX,
+        effectiveCellSizeY,
       };
     },
     hitTest: (clientX: number, clientY: number) => {
@@ -186,11 +190,13 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
       const grid = mapGrid ?? { width: 0, height: 0 };
       const logicalW = grid.width * cellSize;
       const logicalH = grid.height * cellSize;
-      const baseScale = Math.min(width / (logicalW || 1), height / (logicalH || 1));
-      const effectiveCellSize = cellSize * baseScale;
+      const scaleX = width / (logicalW || 1);
+      const scaleY = height / (logicalH || 1);
+      const effectiveCellSizeX = cellSize * scaleX;
+      const effectiveCellSizeY = cellSize * scaleY;
 
-      const x = Math.floor(logicalX / effectiveCellSize);
-      const y = Math.floor(logicalY / effectiveCellSize);
+      const x = Math.floor(logicalX / effectiveCellSizeX);
+      const y = Math.floor(logicalY / effectiveCellSizeY);
 
       if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return null;
       return { x, y };
@@ -256,11 +262,13 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
       const grid = mapGrid ?? { width: 0, height: 0 };
       const logicalW = grid.width * cellSize;
       const logicalH = grid.height * cellSize;
-      const baseScale = Math.min(width / (logicalW || 1), height / (logicalH || 1));
-      const effectiveCellSize = cellSize * baseScale;
+      const scaleX = width / (logicalW || 1);
+      const scaleY = height / (logicalH || 1);
+      const effectiveCellSizeX = cellSize * scaleX;
+      const effectiveCellSizeY = cellSize * scaleY;
 
-      const x = Math.floor(logicalX / effectiveCellSize);
-      const y = Math.floor(logicalY / effectiveCellSize);
+      const x = Math.floor(logicalX / effectiveCellSizeX);
+      const y = Math.floor(logicalY / effectiveCellSizeY);
 
       if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) {
         return null;
@@ -296,27 +304,23 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
 
     const grid = mapGrid ?? { width: 0, height: 0, cells: {} };
 
-    // Base scale: fit the logical grid inside the canvas at zoom=1
+    // Base scale: 方案B — 分别独立填满 X/Y，消除黑边
     // Use CSS dimensions (width/height), not physical canvas pixels
     const logicalW = grid.width * cellSize;
     const logicalH = grid.height * cellSize;
-    const baseScale = Math.min(width / (logicalW || 1), height / (logicalH || 1));
-    const effectiveCellSize = cellSize * baseScale;
+    const scaleX = width / (logicalW || 1);
+    const scaleY = height / (logicalH || 1);
+    const ecX = cellSize * scaleX; // 格子在 X 方向的像素宽度
+    const ecY = cellSize * scaleY; // 格子在 Y 方向的像素高度
 
-    // Center offset: position the grid in the middle of the canvas
-    const renderedW = grid.width * effectiveCellSize;
-    const renderedH = grid.height * effectiveCellSize;
-    const offsetX = (width - renderedW) / 2;
-    const offsetY = (height - renderedH) / 2;
-
-    // On first render, set default pan to the center offset
+    // 填满模式：初始 pan 设为 (0, 0)，无需居中偏移
     if (!hasInitializedRef.current && grid.width > 0) {
-      defaultCenterRef.current = { x: offsetX, y: offsetY };
-      panRef.current = { x: offsetX, y: offsetY };
+      defaultCenterRef.current = { x: 0, y: 0 };
+      panRef.current = { x: 0, y: 0 };
       hasInitializedRef.current = true;
     }
     // Always keep defaultCenterRef in sync with current canvas size
-    defaultCenterRef.current = { x: offsetX, y: offsetY };
+    defaultCenterRef.current = { x: 0, y: 0 };
 
     const zoom = zoomRef.current;
     const pan = panRef.current;
@@ -335,26 +339,26 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
 
     // Grid area background — distinct from canvas background so boundary is clear
     ctx.fillStyle = '#faf3e0';
-    ctx.fillRect(0, 0, grid.width * effectiveCellSize, grid.height * effectiveCellSize);
+    ctx.fillRect(0, 0, grid.width * ecX, grid.height * ecY);
 
     // Grid border
     ctx.strokeStyle = '#5D4037';
     ctx.lineWidth = 1.5 / zoom;
-    ctx.strokeRect(0, 0, grid.width * effectiveCellSize, grid.height * effectiveCellSize);
+    ctx.strokeRect(0, 0, grid.width * ecX, grid.height * ecY);
 
     // Grid lines
     ctx.strokeStyle = 'rgba(100, 100, 100, 0.15)';
     ctx.lineWidth = 0.5 / zoom; // keep constant visual thickness
     for (let x = 0; x <= grid.width; x++) {
       ctx.beginPath();
-      ctx.moveTo(x * effectiveCellSize, 0);
-      ctx.lineTo(x * effectiveCellSize, grid.height * effectiveCellSize);
+      ctx.moveTo(x * ecX, 0);
+      ctx.lineTo(x * ecX, grid.height * ecY);
       ctx.stroke();
     }
     for (let y = 0; y <= grid.height; y++) {
       ctx.beginPath();
-      ctx.moveTo(0, y * effectiveCellSize);
-      ctx.lineTo(grid.width * effectiveCellSize, y * effectiveCellSize);
+      ctx.moveTo(0, y * ecY);
+      ctx.lineTo(grid.width * ecX, y * ecY);
       ctx.stroke();
     }
 
@@ -371,10 +375,10 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
         if (cell.layerId !== layerId) return;
         ctx.fillStyle = cell.color;
         ctx.fillRect(
-          cell.x * effectiveCellSize,
-          cell.y * effectiveCellSize,
-          effectiveCellSize,
-          effectiveCellSize
+          cell.x * ecX,
+          cell.y * ecY,
+          ecX,
+          ecY
         );
       });
     });
@@ -402,28 +406,29 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
       ctx.beginPath();
       Object.entries(territoryCells).forEach(([key, color]) => {
         const [x, y] = key.split(',').map(Number);
-        const px = x * effectiveCellSize;
-        const py = y * effectiveCellSize;
-        const sz = effectiveCellSize;
+        const px = x * ecX;
+        const py = y * ecY;
+        const szX = ecX;
+        const szY = ecY;
         // Top edge
         if (territoryCells[`${x},${y - 1}`] !== color) {
           ctx.moveTo(px, py);
-          ctx.lineTo(px + sz, py);
+          ctx.lineTo(px + szX, py);
         }
         // Bottom edge
         if (territoryCells[`${x},${y + 1}`] !== color) {
-          ctx.moveTo(px, py + sz);
-          ctx.lineTo(px + sz, py + sz);
+          ctx.moveTo(px, py + szY);
+          ctx.lineTo(px + szX, py + szY);
         }
         // Left edge
         if (territoryCells[`${x - 1},${y}`] !== color) {
           ctx.moveTo(px, py);
-          ctx.lineTo(px, py + sz);
+          ctx.lineTo(px, py + szY);
         }
         // Right edge
         if (territoryCells[`${x + 1},${y}`] !== color) {
-          ctx.moveTo(px + sz, py);
-          ctx.lineTo(px + sz, py + sz);
+          ctx.moveTo(px + szX, py);
+          ctx.lineTo(px + szX, py + szY);
         }
       });
       ctx.stroke();
@@ -433,26 +438,27 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
       const borderPathsByColor: Record<string, Array<[number, number, number, number]>> = {};
       Object.entries(territoryCells).forEach(([key, color]) => {
         const [x, y] = key.split(',').map(Number);
-        const px = x * effectiveCellSize;
-        const py = y * effectiveCellSize;
-        const sz = effectiveCellSize;
+        const px = x * ecX;
+        const py = y * ecY;
+        const szX = ecX;
+        const szY = ecY;
         if (!borderPathsByColor[color]) borderPathsByColor[color] = [];
         const segments = borderPathsByColor[color];
         // Top edge
         if (territoryCells[`${x},${y - 1}`] !== color) {
-          segments.push([px, py, px + sz, py]);
+          segments.push([px, py, px + szX, py]);
         }
         // Bottom edge
         if (territoryCells[`${x},${y + 1}`] !== color) {
-          segments.push([px, py + sz, px + sz, py + sz]);
+          segments.push([px, py + szY, px + szX, py + szY]);
         }
         // Left edge
         if (territoryCells[`${x - 1},${y}`] !== color) {
-          segments.push([px, py, px, py + sz]);
+          segments.push([px, py, px, py + szY]);
         }
         // Right edge
         if (territoryCells[`${x + 1},${y}`] !== color) {
-          segments.push([px + sz, py, px + sz, py + sz]);
+          segments.push([px + szX, py, px + szX, py + szY]);
         }
       });
 
@@ -472,7 +478,7 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
     }
 
     // ── Event markers ─────────────────────────────────────────────────────
-    if (events.length > 0 && effectiveCellSize * zoom > 2) {
+    if (events.length > 0 && ecX * zoom > 2) {
       const eventLayer = mapLayers.find((l) => l.id === 'event');
       if (eventLayer?.visible) {
         // Build city position map for events with cityId
@@ -513,9 +519,9 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
           }
           if (ex < 0 || ey < 0) return; // No position to render
 
-          const cx = (ex + 0.5) * effectiveCellSize;
-          const cy = (ey + 0.5) * effectiveCellSize;
-          const markerR = Math.max(2.5, effectiveCellSize * 0.3);
+          const cx = (ex + 0.5) * ecX;
+          const cy = (ey + 0.5) * ecY;
+          const markerR = Math.max(2.5, Math.min(ecX, ecY) * 0.3);
 
           // Diamond shape for events
           ctx.globalAlpha = 0.85;
@@ -535,8 +541,8 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
           ctx.stroke();
 
           // Event label (only when zoomed in enough)
-          if (effectiveCellSize * zoom > 5) {
-            const fontSize = Math.max(7, Math.min(10, effectiveCellSize * 1.2));
+          if (ecX * zoom > 5) {
+            const fontSize = Math.max(7, Math.min(10, Math.min(ecX, ecY) * 1.2));
             ctx.font = `bold ${fontSize}px "Noto Sans SC", sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
@@ -582,18 +588,18 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
           const cx = hc.x + dx;
           const cy = hc.y + dy;
           if (cx < 0 || cy < 0 || cx >= grid.width || cy >= grid.height) continue;
-          const px = cx * effectiveCellSize;
-          const py = cy * effectiveCellSize;
+          const px = cx * ecX;
+          const py = cy * ecY;
           ctx.fillStyle = currentTool === 'eraser'
             ? 'rgba(255, 100, 100, 0.25)'
             : 'rgba(255, 255, 255, 0.3)';
-          ctx.fillRect(px, py, effectiveCellSize, effectiveCellSize);
+          ctx.fillRect(px, py, ecX, ecY);
           // Border around each preview cell
           ctx.strokeStyle = currentTool === 'eraser'
             ? 'rgba(255, 80, 80, 0.5)'
             : 'rgba(255, 255, 255, 0.5)';
           ctx.lineWidth = 0.5 / zoom;
-          ctx.strokeRect(px, py, effectiveCellSize, effectiveCellSize);
+          ctx.strokeRect(px, py, ecX, ecY);
         }
       }
     }
@@ -602,7 +608,7 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
 
     // Notify parent of pan/zoom state for overlay sync
     if (onPanZoomChange) {
-      onPanZoomChange(pan.x, pan.y, zoom, effectiveCellSize);
+      onPanZoomChange(pan.x, pan.y, zoom, ecX, ecY);
     }
   }, [mapGrid, mapLayers, factions, cities, events, cellSize, width, height, onPanZoomChange]);
 

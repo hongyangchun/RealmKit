@@ -47,7 +47,7 @@ const MapCanvas: React.FC = () => {
   const [showGrid, setShowGrid] = useState(true);
   const [showLayerPanel, setShowLayerPanel] = useState(true);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-  const [panZoom, setPanZoom] = useState({ panX: 0, panY: 0, zoom: 1, effectiveCellSize: 10 });
+  const [panZoom, setPanZoom] = useState({ panX: 0, panY: 0, zoom: 1, effectiveCellSize: 10, effectiveCellSizeY: 10 });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'info' });
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -108,8 +108,8 @@ const MapCanvas: React.FC = () => {
 
   // Pan/zoom change handler for city marker overlay sync
   const handlePanZoomChange = useCallback(
-    (panX: number, panY: number, zoom: number, effectiveCellSize: number) => {
-      setPanZoom({ panX, panY, zoom, effectiveCellSize });
+    (panX: number, panY: number, zoom: number, effectiveCellSize: number, effectiveCellSizeY?: number) => {
+      setPanZoom({ panX, panY, zoom, effectiveCellSize, effectiveCellSizeY: effectiveCellSizeY ?? effectiveCellSize });
     },
     []
   );

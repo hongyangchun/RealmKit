@@ -70,7 +70,7 @@ const MapViewer: React.FC = () => {
 
   // ── Canvas state ──
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-  const [panZoom, setPanZoom] = useState({ panX: 0, panY: 0, zoom: 1, effectiveCellSize: 10 });
+  const [panZoom, setPanZoom] = useState({ panX: 0, panY: 0, zoom: 1, effectiveCellSize: 10, effectiveCellSizeY: 10 });
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const gridCanvasRef = useRef<React.ComponentRef<typeof GridCanvas>>(null);
 
@@ -231,8 +231,8 @@ const MapViewer: React.FC = () => {
   }, [cityFormMode, addCity, updateCity]);
 
   const handlePanZoomChange = useCallback(
-    (panX: number, panY: number, zoom: number, effectiveCellSize: number) => {
-      setPanZoom({ panX, panY, zoom, effectiveCellSize });
+    (panX: number, panY: number, zoom: number, effectiveCellSize: number, effectiveCellSizeY?: number) => {
+      setPanZoom({ panX, panY, zoom, effectiveCellSize, effectiveCellSizeY: effectiveCellSizeY ?? effectiveCellSize });
     },
     []
   );
@@ -385,6 +385,7 @@ const MapViewer: React.FC = () => {
                   <MapCityMarker
                     city={city}
                     effectiveCellSize={panZoom.effectiveCellSize}
+                    effectiveCellSizeY={panZoom.effectiveCellSizeY}
                     onClick={handleCityClick}
                     onDragEnd={handleCityDragEnd}
                     hitTest={(cx, cy) => gridCanvasRef.current?.hitTest(cx, cy) ?? null}

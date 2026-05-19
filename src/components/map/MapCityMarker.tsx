@@ -57,6 +57,8 @@ function CityTypeIcon({ type, size }: { type: City['type']; size: number }) {
 interface MapCityMarkerProps {
   city: City;
   effectiveCellSize: number;
+  /** Y 方向格子像素大小（方案B 分离缩放时使用），不传则与 effectiveCellSize 相同 */
+  effectiveCellSizeY?: number;
   onClick?: (city: City) => void;
   onDragEnd?: (cityId: string, gridX: number, gridY: number) => void;
   hitTest: (clientX: number, clientY: number) => { x: number; y: number } | null;
@@ -67,6 +69,7 @@ interface MapCityMarkerProps {
 const MapCityMarker: React.FC<MapCityMarkerProps> = ({
   city,
   effectiveCellSize,
+  effectiveCellSizeY,
   onClick,
   onDragEnd,
   hitTest,
@@ -90,6 +93,9 @@ const MapCityMarker: React.FC<MapCityMarkerProps> = ({
   const color = faction?.color ?? '#8B4513';
   const isCapital = city.isCapital;
   const currentPos = isDragging && dragGridPos ? dragGridPos : { x: city.gridX, y: city.gridY };
+
+  // Y 方向格子大小（方案B 分离缩放），未传则与 X 相同
+  const ecY = effectiveCellSizeY ?? effectiveCellSize;
 
   // Visual sizing based on effectiveCellSize
   const markerRadius = isCapital
@@ -171,7 +177,7 @@ const MapCityMarker: React.FC<MapCityMarkerProps> = ({
       sx={{
         position: 'absolute',
         left: (currentPos.x + 0.5) * effectiveCellSize,
-        top: (currentPos.y + 0.5) * effectiveCellSize,
+        top: (currentPos.y + 0.5) * ecY,
         transform: 'translate(-50%, -50%)',
         cursor: isDragging ? 'grabbing' : (draggable ? 'grab' : 'pointer'),
         zIndex: isDragging ? 30 : 12,
