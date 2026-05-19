@@ -43,61 +43,61 @@ interface TerrainParams {
 }
 
 const TERRAIN_PARAMS: Record<TerrainType, TerrainParams> = {
-  // 大陆：大面积陆地，经典陆地+海洋分布
+  // 大陆：陆地铺满全图，零散内海/湖泊
   continent: {
-    waterLevel: 0.35,
-    shallowWaterLevel: 0.28,
-    beachLevel: 0.38,
-    hillLevel: 0.60,
-    mountainLevel: 0.75,
+    waterLevel: 0.25,
+    shallowWaterLevel: 0.20,
+    beachLevel: 0.28,
+    hillLevel: 0.55,
+    mountainLevel: 0.72,
     snowLevel: 0.88,
     desertBias: 0,
     snowBias: 0,
     noiseFrequency: 0.02,
     noiseOctaves: 4,
-    maskEdge: 0.9,
+    maskEdge: 0,             // 0 = 不使用岛屿遮罩，地形铺满全图
   },
-  // 群岛：大量水域，稀疏的小岛
+  // 群岛：保留岛屿遮罩，水域环绕岛屿
   archipelago: {
-    waterLevel: 0.55,
-    shallowWaterLevel: 0.48,
-    beachLevel: 0.57,
-    hillLevel: 0.72,
+    waterLevel: 0.48,
+    shallowWaterLevel: 0.42,
+    beachLevel: 0.50,
+    hillLevel: 0.70,
     mountainLevel: 0.82,
     snowLevel: 0.92,
     desertBias: 0,
     snowBias: 0,
     noiseFrequency: 0.045,  // 高频率 → 更破碎的地形
     noiseOctaves: 5,
-    maskEdge: 1.1,          // 更陡的边缘 → 岛更分散
+    maskEdge: 0.65,          // 适度遮罩，边缘有水域但不过分
   },
-  // 沙漠：极少的深水，大片沙漠和沙丘，偶见绿洲
+  // 沙漠：几乎无水域，大片沙漠和沙丘，偶见绿洲
   desert: {
-    waterLevel: 0.25,
-    shallowWaterLevel: 0.20,
-    beachLevel: 0.28,
-    hillLevel: 0.55,
-    mountainLevel: 0.75,
+    waterLevel: 0.18,
+    shallowWaterLevel: 0.14,
+    beachLevel: 0.22,
+    hillLevel: 0.50,
+    mountainLevel: 0.72,
     snowLevel: 0.90,
     desertBias: 0.85,
     snowBias: 0,
     noiseFrequency: 0.025,
     noiseOctaves: 4,
-    maskEdge: 0.7,          // 缓边缘 → 陆地向四周延伸更远
+    maskEdge: 0,             // 不使用遮罩
   },
-  // 冰原：大片雪地和冰川，冰冻海面
+  // 冰原：大片雪地和冰川，少量冰冻湖泊
   tundra: {
-    waterLevel: 0.35,
-    shallowWaterLevel: 0.28,
-    beachLevel: 0.38,
-    hillLevel: 0.52,
-    mountainLevel: 0.65,
+    waterLevel: 0.22,
+    shallowWaterLevel: 0.18,
+    beachLevel: 0.25,
+    hillLevel: 0.48,
+    mountainLevel: 0.62,
     snowLevel: 0.72,
     desertBias: 0,
     snowBias: 0.7,
     noiseFrequency: 0.02,
     noiseOctaves: 4,
-    maskEdge: 0.85,
+    maskEdge: 0,             // 不使用遮罩
   },
 };
 
@@ -208,11 +208,12 @@ export class MapGenerator {
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        // 海拔：多 octave 噪声 + 岛屿遮罩
+        // 海拔：多 octave 噪声 + 岛屿遮罩（maskEdge=0 时不应用遮罩）
         const rawElevation = fbm(elevationNoise, x, y, params.noiseOctaves, params.noiseFrequency, 1, 0.5);
-        const mask = islandMask(x, y, width, height, params.maskEdge);
-        // 将 [-1,1] 映射到 [0,1] 并应用遮罩
-        const elevation = Math.max(0, Math.min(1, (rawElevation + 1) / 2 * mask));
+        const baseElev = (rawElevation + 1) / 2; // 将 [-1,1] 映射到 [0,1]
+        const elevation = params.maskEdge > 0
+          ? Math.max(0, Math.min(1, baseElev * islandMask(x, y, width, height, params.maskEdge)))
+          : Math.max(0, Math.min(1, baseElev));
 
         // 湿度：多 octave 噪声
         const rawMoisture = fbm(moistureNoise, x, y, 3, 0.03, 1, 0.5);
