@@ -19,6 +19,7 @@ import type {
   GridCell,
   LayerId,
   DrawingTool,
+  BrushSize,
   HistoryEntry,
   WorldSeedResult,
 } from '../types';
@@ -77,6 +78,7 @@ interface WorldStore {
   drawingTool: DrawingTool;
   drawingColor: string;
   activeLayerId: LayerId;
+  brushSize: BrushSize;
   undoStack: HistoryEntry[];
   redoStack: HistoryEntry[];
 
@@ -124,6 +126,7 @@ interface WorldStore {
   // ── Map Grid Drawing ──────────────────────────────────────────────────────
   setDrawingTool: (tool: DrawingTool) => void;
   setDrawingColor: (color: string) => void;
+  setBrushSize: (size: BrushSize) => void;
   setActiveLayerId: (layerId: LayerId) => void;
   updateLayer: (layerId: LayerId, patch: Partial<MapLayer>) => void;
   paintCell: (x: number, y: number) => void;
@@ -247,6 +250,7 @@ export const useWorldStore = create<WorldStore>((set, get) => {
     drawingTool: 'pan',
     drawingColor: '#1a237e',
     activeLayerId: 'territory',
+    brushSize: 1,
     undoStack: [],
     redoStack: [],
 
@@ -558,6 +562,8 @@ export const useWorldStore = create<WorldStore>((set, get) => {
 
     setDrawingColor: (color) => set({ drawingColor: color }),
 
+    setBrushSize: (size) => set({ brushSize: size }),
+
     setActiveLayerId: (layerId) => set({ activeLayerId: layerId }),
 
     updateLayer: (layerId, patch) =>
@@ -572,7 +578,7 @@ export const useWorldStore = create<WorldStore>((set, get) => {
 
     paintCell: (x, y) =>
       set((s) => {
-        const { activeLayerId, drawingColor, data } = s;
+        const { activeLayerId, drawingColor, brushSize, data } = s;
         const grid = data.mapGrid ?? DEFAULT_GRID;
         const layers = data.mapLayers ?? DEFAULT_LAYERS;
         const activeLayer = layers.find((l) => l.id === activeLayerId);
@@ -580,26 +586,40 @@ export const useWorldStore = create<WorldStore>((set, get) => {
         // Don't paint on read-only layers
         if (activeLayer?.isReadOnly) return s;
 
-        const key = `${activeLayerId}:${x},${y}`;
+        const halfSize = Math.floor(brushSize / 2);
+        const newCells = { ...grid.cells };
+        const paintedCells: GridCell[] = [];
         const previousCells: Record<string, GridCell> = {};
-        const existingCell = grid.cells[key];
 
-        if (existingCell && existingCell.layerId === activeLayerId) {
-          // Same layer, update color
-          previousCells[key] = existingCell;
-        } else if (existingCell) {
-          // Different layer, preserve that cell
-          previousCells[key] = existingCell;
+        for (let dx = -halfSize; dx <= halfSize; dx++) {
+          for (let dy = -halfSize; dy <= halfSize; dy++) {
+            const cx = x + dx;
+            const cy = y + dy;
+            // Bounds check
+            if (cx < 0 || cy < 0 || cx >= grid.width || cy >= grid.height) continue;
+
+            const key = `${activeLayerId}:${cx},${cy}`;
+            const existingCell = grid.cells[key];
+
+            if (existingCell && existingCell.layerId === activeLayerId) {
+              previousCells[key] = existingCell;
+            } else if (existingCell) {
+              previousCells[key] = existingCell;
+            }
+
+            const newCell: GridCell = {
+              x: cx,
+              y: cy,
+              color: drawingColor,
+              layerId: activeLayerId,
+            };
+            newCells[key] = newCell;
+            paintedCells.push(newCell);
+          }
         }
 
-        const newCell: GridCell = {
-          x,
-          y,
-          color: drawingColor,
-          layerId: activeLayerId,
-        };
+        if (paintedCells.length === 0) return s;
 
-        const newCells = { ...grid.cells, [key]: newCell };
         const newGrid = { ...grid, cells: newCells };
         const newData = { ...data, mapGrid: newGrid };
 
@@ -607,7 +627,7 @@ export const useWorldStore = create<WorldStore>((set, get) => {
         const historyEntry: HistoryEntry = {
           type: 'paint',
           layerId: activeLayerId,
-          cells: [newCell],
+          cells: paintedCells,
           previousCells,
         };
 
@@ -619,7 +639,7 @@ export const useWorldStore = create<WorldStore>((set, get) => {
 
     eraseCell: (x, y) =>
       set((s) => {
-        const { activeLayerId, data } = s;
+        const { activeLayerId, brushSize, data } = s;
         const grid = data.mapGrid ?? DEFAULT_GRID;
         const layers = data.mapLayers ?? DEFAULT_LAYERS;
         const activeLayer = layers.find((l) => l.id === activeLayerId);
@@ -627,17 +647,29 @@ export const useWorldStore = create<WorldStore>((set, get) => {
         // Don't erase on read-only layers
         if (activeLayer?.isReadOnly) return s;
 
-        const key = `${activeLayerId}:${x},${y}`;
-        const existingCell = grid.cells[key];
+        const halfSize = Math.floor(brushSize / 2);
+        const newCells = { ...grid.cells };
+        const previousCells: Record<string, GridCell> = {};
+        let erased = false;
 
-        if (!existingCell || existingCell.layerId !== activeLayerId) {
-          return s; // Nothing to erase
+        for (let dx = -halfSize; dx <= halfSize; dx++) {
+          for (let dy = -halfSize; dy <= halfSize; dy++) {
+            const cx = x + dx;
+            const cy = y + dy;
+            if (cx < 0 || cy < 0 || cx >= grid.width || cy >= grid.height) continue;
+
+            const key = `${activeLayerId}:${cx},${cy}`;
+            const existingCell = grid.cells[key];
+
+            if (existingCell && existingCell.layerId === activeLayerId) {
+              previousCells[key] = existingCell;
+              delete newCells[key];
+              erased = true;
+            }
+          }
         }
 
-        const previousCells: Record<string, GridCell> = { [key]: existingCell };
-
-        const newCells = { ...grid.cells };
-        delete newCells[key];
+        if (!erased) return s;
 
         const newGrid = { ...grid, cells: newCells };
         const newData = { ...data, mapGrid: newGrid };

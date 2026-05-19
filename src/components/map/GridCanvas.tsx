@@ -106,6 +106,12 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
   // Track last hovered faction to avoid redundant callbacks
   const lastHoveredFactionRef = useRef<string | null>(null);
 
+  // Track hovered cell for brush preview cursor
+  const hoveredCellRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Track hover rendering with rAF throttling to avoid full redraw per mousemove
+  const hoverRafRef = useRef<number>(0);
+
   // Track default centered pan for resetView
   const defaultCenterRef = useRef({ x: 0, y: 0 });
   // Flag: has initial center been computed?
@@ -198,11 +204,21 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
   const events = useWorldStore((s) => s.data.events);
   const drawingTool = useWorldStore((s) => s.drawingTool);
   const activeLayerId = useWorldStore((s) => s.activeLayerId);
+  const brushSize = useWorldStore((s) => s.brushSize);
   const paintCell = useWorldStore((s) => s.paintCell);
   const eraseCell = useWorldStore((s) => s.eraseCell);
   const initGrid = useWorldStore((s) => s.initGrid);
 
   const cellSize = mapGrid?.cellSize ?? 10;
+
+  // Keep latest drawingTool/brushSize/readOnly in refs so renderCanvas (useCallback)
+  // can read them without needing to be recreated on every change.
+  const drawingToolRef = useRef(drawingTool);
+  drawingToolRef.current = drawingTool;
+  const brushSizeRef = useRef(brushSize);
+  brushSizeRef.current = brushSize;
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
 
   // Initialize grid when container size changes
   useEffect(() => {
@@ -545,6 +561,34 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
       }
     }
 
+    // ── Brush/eraser size preview cursor ──────────────────────────────────────
+    const currentTool = readOnlyRef.current ? 'pan' : drawingToolRef.current;
+    const currentBrushSize = brushSizeRef.current;
+    if ((currentTool === 'brush' || currentTool === 'eraser') && hoveredCellRef.current) {
+      const hc = hoveredCellRef.current;
+      const halfSize = Math.floor(currentBrushSize / 2);
+      const grid = mapGrid ?? { width: 0, height: 0 };
+      for (let dx = -halfSize; dx <= halfSize; dx++) {
+        for (let dy = -halfSize; dy <= halfSize; dy++) {
+          const cx = hc.x + dx;
+          const cy = hc.y + dy;
+          if (cx < 0 || cy < 0 || cx >= grid.width || cy >= grid.height) continue;
+          const px = cx * effectiveCellSize;
+          const py = cy * effectiveCellSize;
+          ctx.fillStyle = currentTool === 'eraser'
+            ? 'rgba(255, 100, 100, 0.25)'
+            : 'rgba(255, 255, 255, 0.3)';
+          ctx.fillRect(px, py, effectiveCellSize, effectiveCellSize);
+          // Border around each preview cell
+          ctx.strokeStyle = currentTool === 'eraser'
+            ? 'rgba(255, 80, 80, 0.5)'
+            : 'rgba(255, 255, 255, 0.5)';
+          ctx.lineWidth = 0.5 / zoom;
+          ctx.strokeRect(px, py, effectiveCellSize, effectiveCellSize);
+        }
+      }
+    }
+
     ctx.restore();
 
     // Notify parent of pan/zoom state for overlay sync
@@ -557,6 +601,15 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
   useEffect(() => {
     renderCanvas();
   }, [renderCanvas]);
+
+  // Cleanup hover rAF on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverRafRef.current) {
+        cancelAnimationFrame(hoverRafRef.current);
+      }
+    };
+  }, []);
 
   // ─── Space key listener for temporary pan mode ────────────────────────────
   useEffect(() => {
@@ -639,9 +692,31 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
       }
 
       if (!isDrawing) {
-        // Not drawing, not panning → check for faction hover
+        // Not drawing, not panning → update brush preview cursor & check faction hover
+        const cell = getCellFromMouse(e);
+        const isBrushTool = effectiveTool === 'brush' || effectiveTool === 'eraser';
+
+        if (isBrushTool) {
+          const prev = hoveredCellRef.current;
+          if (!cell && prev || cell && !prev || (cell && prev && (cell.x !== prev.x || cell.y !== prev.y))) {
+            hoveredCellRef.current = cell;
+            // Throttle redraws via rAF to avoid full-canvas repaint per mousemove
+            if (!hoverRafRef.current) {
+              hoverRafRef.current = requestAnimationFrame(() => {
+                hoverRafRef.current = 0;
+                renderCanvas();
+              });
+            }
+          }
+        } else {
+          // Clear preview when switching to non-brush tool
+          if (hoveredCellRef.current) {
+            hoveredCellRef.current = null;
+            renderCanvas();
+          }
+        }
+
         if (onHoverFaction) {
-          const cell = getCellFromMouse(e);
           if (cell) {
             const grid = mapGrid ?? { width: 0, height: 0, cells: {} };
             const cellKey = `territory:${cell.x},${cell.y}`;
@@ -720,12 +795,17 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
     mouseDownPosRef.current = null;
     setIsDrawing(false);
     setLastCell(null);
+    // Clear brush preview
+    if (hoveredCellRef.current) {
+      hoveredCellRef.current = null;
+      renderCanvas();
+    }
     // Clear hover when mouse leaves canvas
     if (onHoverFaction && lastHoveredFactionRef.current !== null) {
       lastHoveredFactionRef.current = null;
       onHoverFaction(null, 0, 0);
     }
-  }, [onHoverFaction]);
+  }, [onHoverFaction, renderCanvas]);
 
   // ─── Wheel zoom ──────────────────────────────────────────────────────────
   // Zooms centered on the mouse position.

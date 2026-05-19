@@ -130,11 +130,15 @@ export interface MapGrid {
 /** 绘制工具类型 */
 export type DrawingTool = 'brush' | 'eraser' | 'pan' | 'pin' | 'city';
 
+/** 笔刷尺寸（以格子为单位的直径：1×1, 3×3, 5×5） */
+export type BrushSize = 1 | 3 | 5;
+
 /** 绘制状态 */
 export interface DrawingState {
   tool: DrawingTool;
   color: string;
   activeLayerId: LayerId;
+  brushSize: BrushSize;
 }
 
 /** 撤销/重做历史记录项 */

@@ -1,13 +1,12 @@
 /**
  * DrawingToolbar - 绘制工具栏
- * 紧凑横向工具按钮 + 撤销/重做
+ * 紧凑横向工具按钮 + 笔刷尺寸选择 + 撤销/重做
  */
 import React from 'react';
 import {
   Box,
   IconButton,
   Tooltip,
-  Typography,
 } from '@mui/material';
 import BrushIcon from '@mui/icons-material/Brush';
 import AutoFixOffIcon from '@mui/icons-material/AutoFixOff';
@@ -17,7 +16,14 @@ import LocationCityIcon from '@mui/icons-material/LocationCity';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import { useWorldStore } from '../../store/worldStore';
-import type { DrawingTool } from '../../types';
+import type { DrawingTool, BrushSize } from '../../types';
+
+/** 笔刷尺寸选项配置 */
+const BRUSH_SIZES: { value: BrushSize; label: string; dotSize: number }[] = [
+  { value: 1, label: '细 (1×1)', dotSize: 4 },
+  { value: 3, label: '中 (3×3)', dotSize: 7 },
+  { value: 5, label: '粗 (5×5)', dotSize: 11 },
+];
 
 interface ToolButtonProps {
   icon: React.ReactNode;
@@ -58,9 +64,51 @@ const ToolButton: React.FC<ToolButtonProps> = ({
   </Tooltip>
 );
 
+/** 笔刷尺寸按钮 */
+const SizeButton: React.FC<{
+  dotSize: number;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}> = ({ dotSize, label, isActive, onClick }) => (
+  <Tooltip title={label} placement="bottom">
+    <IconButton
+      onClick={onClick}
+      sx={{
+        width: 24,
+        height: 24,
+        borderRadius: '50%',
+        minWidth: 0,
+        padding: 0,
+        border: isActive ? '1.5px solid' : '1px solid',
+        borderColor: isActive ? 'primary.main' : 'rgba(0,0,0,0.2)',
+        bgcolor: isActive ? 'rgba(25, 118, 210, 0.08)' : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.15s',
+        '&:hover': {
+          bgcolor: isActive ? 'rgba(25, 118, 210, 0.12)' : 'rgba(0,0,0,0.04)',
+        },
+      }}
+    >
+      <Box
+        sx={{
+          width: dotSize,
+          height: dotSize,
+          borderRadius: '50%',
+          bgcolor: isActive ? 'primary.main' : 'rgba(0,0,0,0.5)',
+        }}
+      />
+    </IconButton>
+  </Tooltip>
+);
+
 const DrawingToolbar: React.FC = () => {
   const drawingTool = useWorldStore((s) => s.drawingTool);
   const setDrawingTool = useWorldStore((s) => s.setDrawingTool);
+  const brushSize = useWorldStore((s) => s.brushSize);
+  const setBrushSize = useWorldStore((s) => s.setBrushSize);
   const activeLayerId = useWorldStore((s) => s.activeLayerId);
   const mapLayers = useWorldStore((s) => s.data.mapLayers ?? []);
   const undoStack = useWorldStore((s) => s.undoStack);
@@ -69,6 +117,9 @@ const DrawingToolbar: React.FC = () => {
   const redo = useWorldStore((s) => s.redo);
   const activeLayer = mapLayers.find((l) => l.id === activeLayerId);
   const isReadOnly = activeLayer?.isReadOnly ?? false;
+
+  // 是否显示尺寸选择器（仅刷子和橡皮擦）
+  const showSizeSelector = drawingTool === 'brush' || drawingTool === 'eraser';
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -121,6 +172,24 @@ const DrawingToolbar: React.FC = () => {
         disabled={isReadOnly}
         onClick={() => setDrawingTool('eraser')}
       />
+
+      {/* 笔刷尺寸选择器：仅在刷子或橡皮擦选中时显示 */}
+      {showSizeSelector && (
+        <>
+          <Box sx={{ width: 1, height: 16, bgcolor: 'rgba(0,0,0,0.08)', mx: 0.25, borderRadius: 0.5 }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, mx: 0.25 }}>
+            {BRUSH_SIZES.map((opt) => (
+              <SizeButton
+                key={opt.value}
+                dotSize={opt.dotSize}
+                label={opt.label}
+                isActive={brushSize === opt.value}
+                onClick={() => setBrushSize(opt.value)}
+              />
+            ))}
+          </Box>
+        </>
+      )}
 
       <Box sx={{ width: 1, height: 20, bgcolor: 'rgba(0,0,0,0.08)', mx: 0.5, borderRadius: 0.5 }} />
 
