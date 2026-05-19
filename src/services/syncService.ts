@@ -52,6 +52,41 @@ class SyncService {
     return document.cookie.includes('CF_Authorization');
   }
 
+  /**
+   * 从 CF_Authorization JWT 中解码当前登录邮箱（无需验证签名）
+   * 返回邮箱字符串，未认证时返回 null
+   */
+  getCurrentUserEmail(): string | null {
+    try {
+      const match = document.cookie.match(/CF_Authorization=([^;]+)/);
+      if (!match) return null;
+      const jwt = match[1];
+      // JWT 格式：header.payload.signature
+      const payloadBase64 = jwt.split('.')[1];
+      if (!payloadBase64) return null;
+      // base64url → base64
+      const base64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/');
+      const json = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+          .join('')
+      );
+      const payload = JSON.parse(json) as { email?: string };
+      return payload.email ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 退出登录：跳转到 Cloudflare Access 的登出端点
+   * 会清除 CF_Authorization cookie 并跳回首页
+   */
+  logout(): void {
+    window.location.href = '/cdn-cgi/access/logout';
+  }
+
   /** 获取当前同步启用状态 */
   isEnabled(): boolean {
     return this.syncEnabled;

@@ -58,6 +58,8 @@ import SaveAltIcon from '@mui/icons-material/SaveAlt';
 import CloudSyncIcon from '@mui/icons-material/CloudSync';
 import CloudDoneIcon from '@mui/icons-material/CloudDone';
 import CloudOffIcon from '@mui/icons-material/CloudOff';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 import { useWorldStore } from '../../store/worldStore';
 import { useAiConfig } from '../../hooks/useAiConfig';
@@ -557,6 +559,28 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   <Typography variant="body2" sx={{ color: '#5D4037', mb: 1 }}>
                     数据变更后自动同步到云端，换设备登录即可恢复。
                   </Typography>
+                  {/* 当前登录账号 */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, p: 1, background: 'rgba(26,35,126,0.04)', borderRadius: 1 }}>
+                    <AccountCircleIcon sx={{ fontSize: 16, color: '#1a237e' }} />
+                    <Typography variant="caption" sx={{ color: '#1a237e', fontWeight: 500, flex: 1 }}>
+                      {syncService.getCurrentUserEmail() ?? '已登录'}
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="text"
+                      startIcon={<LogoutIcon sx={{ fontSize: 14 }} />}
+                      onClick={() => syncService.logout()}
+                      sx={{
+                        fontSize: '0.7rem',
+                        color: '#888',
+                        minWidth: 0,
+                        px: 1,
+                        '&:hover': { color: '#E65100', background: 'rgba(230,81,0,0.06)' },
+                      }}
+                    >
+                      切换账号
+                    </Button>
+                  </Box>
                   {syncService.getLastSyncAt() && (
                     <Typography variant="caption" sx={{ color: '#888', display: 'block', mb: 1 }}>
                       上次同步：{new Date(syncService.getLastSyncAt()!).toLocaleString('zh-CN')}
