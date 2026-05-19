@@ -227,6 +227,8 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
   readOnlyRef.current = readOnly;
 
   // Initialize grid when container size changes
+  // readOnly 模式下（如 ReadOnlyMapPreview）不调用 initGrid，
+  // 因为只读预览不应修改全局网格数据（避免覆盖种子生成器的网格尺寸）
   useEffect(() => {
     if (width > 0 && height > 0) {
       const gridWidth = Math.floor(width / cellSize);
@@ -234,12 +236,14 @@ const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(({ width, heigh
       if (onSizeChange) {
         onSizeChange(mapGrid?.width ?? gridWidth, mapGrid?.height ?? gridHeight);
       }
-      const hasExistingData = mapGrid && Object.keys(mapGrid.cells).length > 0;
-      if (!mapGrid || (!hasExistingData && (mapGrid.width !== gridWidth || mapGrid.height !== gridHeight))) {
-        initGrid(gridWidth, gridHeight, cellSize);
+      if (!readOnly) {
+        const hasExistingData = mapGrid && Object.keys(mapGrid.cells).length > 0;
+        if (!mapGrid || (!hasExistingData && (mapGrid.width !== gridWidth || mapGrid.height !== gridHeight))) {
+          initGrid(gridWidth, gridHeight, cellSize);
+        }
       }
     }
-  }, [width, height, cellSize, mapGrid, initGrid, onSizeChange]);
+  }, [width, height, cellSize, mapGrid, initGrid, onSizeChange, readOnly]);
 
   // ─── Coordinate unprojection: screen → grid cell ──────────────────────────
   // Applies the inverse of the canvas transform (pan + zoom) to get grid coords.

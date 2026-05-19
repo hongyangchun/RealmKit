@@ -43,6 +43,12 @@
 - `src/services/importExport.ts` — ImportExportService 单例
 - `src/services/backupTracker.ts` — 备份时间追踪
 
+## GridCanvas 架构要点
+- **两个实例共享同一 Zustand store**：MapViewer（编辑器）和 ReadOnlyMapPreview（仪表盘预览）
+- **initGrid useEffect**：仅在非 readOnly 模式下调用 initGrid，避免 ReadOnlyMapPreview 覆盖种子生成器的网格尺寸
+- **方案B 缩放**：独立 X/Y 缩放（scaleX/scaleY），地图始终填满容器，不保留等比黑边
+- **种子生成器固定尺寸**：100×100 grid，cellSize=10，mapGenerator 生成地形和领地
+
 ## 代码规范
 - 中文注释，中文 UI 文案
 - 世界中世纪风格配色：#1a237e（主蓝）、#5D4037（棕色）、#faf3e0（羊皮纸底色）
