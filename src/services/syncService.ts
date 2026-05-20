@@ -32,6 +32,8 @@ class SyncService {
   private syncEnabled: boolean = false;
   private deviceId: string;
   private lastSyncAt: string | null = null;
+  private _lastError: string | null = null;
+  private _consecutiveFailures: number = 0;
 
   constructor() {
     this.deviceId = this.getOrCreateDeviceId();
@@ -108,6 +110,16 @@ class SyncService {
   /** 获取设备 ID */
   getDeviceId(): string {
     return this.deviceId;
+  }
+
+  /** 获取最近一次同步错误 */
+  getLastError(): string | null {
+    return this._lastError;
+  }
+
+  /** 是否存在未解决的同步问题 */
+  hasSyncProblem(): boolean {
+    return this._consecutiveFailures >= 2;
   }
 
   /** 世界数据变更 → debounce 后同步到 D1 */
@@ -268,8 +280,14 @@ class SyncService {
       const pending = this.pendingFns.get(key);
       if (pending) {
         this.pendingFns.delete(key);
-        pending().catch((err) => {
-          console.warn(`[SyncService] ${key} 同步失败:`, err);
+        pending().then(() => {
+          this._lastError = null;
+          this._consecutiveFailures = 0;
+        }).catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[SyncService] ${key} 同步失败:`, msg);
+          this._lastError = `${key}: ${msg}`;
+          this._consecutiveFailures++;
           // 保存失败的操作，网络恢复后重试
           this.pendingFns.set(key, pending);
         });
@@ -289,6 +307,9 @@ class SyncService {
     });
 
     if (!response.ok) {
+      if (response.status === 500) {
+        throw new Error('服务器内部错误 (500)，D1 数据库可能未正确配置');
+      }
       throw new Error(`POST /api/world failed: ${response.status}`);
     }
 
@@ -313,6 +334,9 @@ class SyncService {
     });
 
     if (!response.ok) {
+      if (response.status === 500) {
+        throw new Error('服务器内部错误 (500)，D1 数据库可能未正确配置');
+      }
       throw new Error(`POST /api/chronicles failed: ${response.status}`);
     }
 
@@ -331,6 +355,12 @@ class SyncService {
       const response = await fetch('/api/world');
       if (response.status === 401) {
         this.syncEnabled = false;
+        this._lastError = '认证失败 (401)，请重新登录';
+        return null;
+      }
+      if (response.status === 500) {
+        this._lastError = '服务器错误 (500)，D1 数据库可能未配置';
+        console.warn('[SyncService] GET /api/world 返回 500，D1 可能未正确配置');
         return null;
       }
       if (!response.ok) {
@@ -341,6 +371,7 @@ class SyncService {
       return { data: result.world, updatedAt: result.updatedAt ?? '' };
     } catch (error) {
       console.warn('[SyncService] 拉取世界数据失败:', error);
+      this._lastError = error instanceof Error ? error.message : String(error);
       return null;
     }
   }
@@ -351,6 +382,10 @@ class SyncService {
       const response = await fetch('/api/chronicles');
       if (response.status === 401) {
         this.syncEnabled = false;
+        return null;
+      }
+      if (response.status === 500) {
+        console.warn('[SyncService] GET /api/chronicles 返回 500，D1 可能未正确配置');
         return null;
       }
       if (!response.ok) {

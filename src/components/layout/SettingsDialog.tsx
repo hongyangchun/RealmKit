@@ -124,6 +124,7 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
   const [exportMenuAnchor, setExportMenuAnchor] = useState<null | HTMLElement>(null);
   const [importConfirmOpen, setImportConfirmOpen] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
+  const [manualSyncStatus, setManualSyncStatus] = useState<'idle' | 'syncing' | 'error' | 'success'>('idle');
 
   // 同步 initialTab
   useEffect(() => {
@@ -559,6 +560,16 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                   <Typography variant="body2" sx={{ color: '#5D4037', mb: 1 }}>
                     数据变更后自动同步到云端，换设备登录即可恢复。
                   </Typography>
+                  {/* 同步错误提示 */}
+                  {syncService.hasSyncProblem() && (
+                    <Alert severity="error" sx={{ mb: 1.5, py: 0.5, '& .MuiAlert-message': { fontSize: '0.75rem' } }}>
+                      云同步失败：{syncService.getLastError()}
+                      <br />
+                      <Typography variant="caption" sx={{ color: '#888' }}>
+                        请检查 D1 数据库是否已创建并绑定到本项目（Cloudflare Dashboard → Pages → Settings → Bindings）
+                      </Typography>
+                    </Alert>
+                  )}
                   {/* 当前登录账号 */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, p: 1, background: 'rgba(26,35,126,0.04)', borderRadius: 1 }}>
                     <AccountCircleIcon sx={{ fontSize: 16, color: '#1a237e' }} />
@@ -591,10 +602,14 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                       size="small"
                       variant="outlined"
                       startIcon={<CloudSyncIcon sx={{ fontSize: 16 }} />}
+                      disabled={manualSyncStatus === 'syncing'}
                       onClick={async () => {
+                        setManualSyncStatus('syncing');
                         const data = useWorldStore.getState().data;
-                        await syncService.forceSyncWorld(data);
+                        const ok = await syncService.forceSyncWorld(data);
                         refreshStorageInfo();
+                        setManualSyncStatus(ok ? 'success' : 'error');
+                        setTimeout(() => setManualSyncStatus('idle'), 3000);
                       }}
                       sx={{
                         fontSize: '0.75rem',
@@ -603,8 +618,13 @@ const SettingsDialog: React.FC<SettingsDialogProps> = ({
                         '&:hover': { borderColor: '#1a237e', background: 'rgba(26,35,126,0.08)' },
                       }}
                     >
-                      立即同步
+                      {manualSyncStatus === 'syncing' ? '同步中...' : manualSyncStatus === 'error' ? '同步失败' : manualSyncStatus === 'success' ? '同步成功' : '立即同步'}
                     </Button>
+                    {manualSyncStatus === 'error' && syncService.getLastError() && (
+                      <Typography variant="caption" sx={{ color: '#E65100', ml: 1 }}>
+                        {syncService.getLastError()}
+                      </Typography>
+                    )}
                   </Box>
                 </>
               ) : (
