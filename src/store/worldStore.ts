@@ -39,7 +39,7 @@ const DEFAULT_META: WorldMeta = {
 };
 
 const DEFAULT_LAYERS: MapLayer[] = [
-  { id: 'terrain', name: '地形层', visible: true, opacity: 0.2 },
+  { id: 'terrain', name: '地形层', visible: true, opacity: 1 },
   { id: 'territory', name: '领土层', visible: true, opacity: 1, color: '#1a237e' },
   { id: 'city', name: '城市层', visible: true, opacity: 0.8, color: '#8B4513' },
   { id: 'event', name: '事件层', visible: true, opacity: 0.7, color: '#C0392B' },
@@ -844,14 +844,14 @@ export const useWorldStore = create<WorldStore>((set, get) => {
     // ── World Seed Generator ────────────────────────────────────────────────
     applyWorldSeed: (seed) =>
       set((s) => {
-        // 获取默认的 mapGrid 配置
-        const DEFAULT_GRID: MapGrid = {
+        // 强制使用 100×100 网格尺寸（与种子生成器一致）
+        // 不复用旧世界的 mapGrid 尺寸，避免尺寸不匹配
+        const mapGrid: MapGrid = {
           width: 100,
           height: 100,
           cellSize: 10,
           cells: {},
         };
-        const mapGrid = s.data.mapGrid ?? DEFAULT_GRID;
 
         // 为所有实体生成唯一 ID
         let idCounter = 0;
@@ -987,7 +987,7 @@ export const useWorldStore = create<WorldStore>((set, get) => {
           mapPins: [],
           mapGrid: newGrid,
           mapLayers: [
-            { id: 'terrain', name: '地形层', visible: true, opacity: 0.2 },
+            { id: 'terrain', name: '地形层', visible: true, opacity: 1 },
             { id: 'territory', name: '领土层', visible: true, opacity: 1, color: '#1a237e' },
             { id: 'city', name: '城市层', visible: true, opacity: 0.8, color: '#8B4513' },
             { id: 'event', name: '事件层', visible: true, opacity: 0.7, color: '#C0392B' },
