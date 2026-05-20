@@ -1,10 +1,9 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "realmkit"
 compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
 
-# D1 数据库绑定 — 部署前需先运行:
-#   npx wrangler d1 create zzworld-db
-# 然后将返回的 database_id 填入下方
+# D1 数据库绑定
 [[d1_databases]]
 binding = "DB"
 database_name = "zzworld-db"
