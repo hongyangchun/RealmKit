@@ -11,7 +11,7 @@
 - `worldStore.ts` 的 `persist()` 函数覆盖全部 35+ 个同步写入点
 - `useAiConfig` 和 `useChronicles` 直接操作 localStorage，不经 IStorageAdapter
 
-## 云同步（D1）方案（2026-05-18 实现）
+## 云同步（D1）方案（2026-05-18 实现，2026-05-20 修复）
 - **策略**：local-first，写 localStorage 后后台异步同步到 D1
 - **认证**：Cloudflare Access JWT（`CF_Authorization` cookie）
 - **同步入口**：只改 `persist()` 和 `saveChronicles()` 两处，覆盖所有写入路径
@@ -19,7 +19,13 @@
 - **合并策略**：世界数据 last-write-wins（比较 updatedAt 时间戳）；编年史基于条目 ID 合并（本地为主，补充云端缺失条目）
 - **AI 配置不同步**（含 API Key，安全考虑）
 - **SyncLoader**：App 最外层包裹，首次加载时合并 D1 数据，含二次校验防止竞态覆盖
-- **设置面板**：数据管理 Tab 显示同步状态、上次同步时间、手动同步按钮
+- **设置面板**：数据管理 Tab 显示同步状态、上次同步时间、手动同步按钮、同步错误提示
+
+### D1 部署关键（2026-05-20 踩坑）
+- **`wrangler.toml` 必须声明 `pages_build_output_dir = "dist"`**，否则 Pages Functions 不注入 D1 binding，API 全部 500
+- GitHub 自动部署（Pages CI）不会读取 wrangler.toml 的 binding；需用 `npx wrangler pages deploy` 部署才能生效
+- **D1 database_id**：`7b3fba7f-5aa8-40a3-b149-5449d304a1ea`（zzworld-db）
+- **同步失败不再静默**：syncService 追踪 `_lastError` 和 `_consecutiveFailures`，设置面板在连续失败时显示红色错误 Alert
 
 ### 新增文件
 - `schema.sql` — D1 数据库 schema（worlds/chronicles/sync_meta 三张表）
