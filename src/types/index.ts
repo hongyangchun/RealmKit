@@ -23,6 +23,9 @@ export interface Faction {
   dissolvedYear?: number;
 }
 
+/** 卡牌稀有度 */
+export type CardRarity = 'common' | 'rare' | 'epic' | 'legendary';
+
 /** 人物技能 */
 export interface Skill {
   name: string;
@@ -36,9 +39,14 @@ export interface Character {
   name: string;
   factionId: string;
   avatar?: string;
+  portrait?: string;        // 全身立绘（区别于头像）
   birthYear?: number;
   deathYear?: number;
-  title?: string;
+  title?: string;            // 职衔（如"将领"、"军师"）
+  nickname?: string;         // 称号（如"美髯公"、"卧龙"）
+  hp?: number;              // 体力值 (1-8)
+  cardNumber?: string;       // 卡牌编号（如"WEI 001"）
+  rarity?: CardRarity;      // 稀有度
   skills: Skill[];
   traits: string[];
   bio: string;
@@ -160,6 +168,7 @@ export interface WorldData {
   events: HistoryEvent[];
   mapPins: MapPin[];
   cities: City[];
+  cardPacks: CardPack[];
   mapImage?: string;
   eras: string[];
   // 网格绘制数据
@@ -311,6 +320,20 @@ export interface WorldSeedResult {
   cities: Omit<City, 'id'>[];
   mapTerritoryCells: TerritoryCell[];
   mapTerrainCells: TerrainCell[];
+}
+
+// =============================================================================
+// 卡片包类型定义
+// =============================================================================
+
+/** 卡片包 — 人物卡片的收纳编队，删除包不影响人物 */
+export interface CardPack {
+  id: string;
+  name: string;
+  description: string;
+  characterIds: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 // =============================================================================

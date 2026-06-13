@@ -1,71 +1,131 @@
 /**
- * CharacterCard - 三国杀风格人物卡片
- * 左侧色带 + 头像/姓名/技能/特质/传记
- * 支持多选模式
+ * CharacterCard - 三国杀武将卡牌风格人物卡片 (v2.0)
+ * 5:7 竖版比例 + 称号+姓名 + 大尺寸插画区 + 勾玉体力 + 技能完整描述
  */
 import React, { useState } from 'react';
 import {
-  Card,
   CardContent,
   Avatar,
   Typography,
   Box,
   Chip,
-  Tooltip,
   Checkbox,
   keyframes,
 } from '@mui/material';
-import ConflictBadge from '../common/ConflictBadge';
-import SkillChip from './SkillChip';
-import LifecycleBar from './LifecycleBar';
+import JadeTokens from './JadeTokens';
 import CharacterCardExporter from './CharacterCardExporter';
-import type { Character, HistoryEvent } from '../../types';
+import type { Character, HistoryEvent, CardRarity } from '../../types';
 import { useWorldStore } from '../../store/worldStore';
 
-// ─── 叙事化装饰动画 ───────────────────────────────────────
+// ─── 稀有度配色 ─────────────────────────────────────
 
-/** 金色光晕脉冲 — 悬停时在边框上显现 */
-const borderGlow = keyframes`
-  0%, 100% {
-    box-shadow: 0 0 4px rgba(255,213,79,0.0), inset 0 0 0 0 transparent;
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(255,213,79,0.25), inset 0 0 12px rgba(255,213,79,0.05);
-  }
+const RARITY_COLORS: Record<CardRarity, { bg: string; border: string; text: string }> = {
+  common:    { bg: '#2a2a2a', border: '#666', text: '#999' },
+  rare:      { bg: '#1a3a5c', border: '#4a9eff', text: '#4a9eff' },
+  epic:      { bg: '#3a1a5c', border: '#9a4aff', text: '#9a4aff' },
+  legendary: { bg: '#5c3a1a', border: '#ff9a4a', text: '#ff9a4a' },
+};
+
+// ─── Props ─────────────────────────────────────────────────────
+
+/** 悬停时金色边框光晕脉冲 */
+const borderPulse = keyframes`
+  0%, 100% { box-shadow: 0 6px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,160,80,0.4); }
+  50%       { box-shadow: 0 6px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,160,80,0.9), 0 0 16px rgba(201,160,80,0.25); }
 `;
 
-// ─── 势力纹样装饰 SVG ─────────────────────────────────────
+/** 卡片浮起动画 */
+const cardLift = keyframes`
+  0%   { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(-6px) rotate(0.3deg); }
+`;
 
-/** 生成势力色带纹样 — 根据势力颜色生成古典花纹 */
-function FactionPattern({ color }: { color: string }) {
+// ─── 势力配色方案（三国杀魏/蜀/吴/无）────────────────────
+
+function getFactionTheme(baseColor: string) {
+  // 将势力原色暗化，生成三国杀风的深色系
+  return {
+    borderColor: baseColor,
+    headerBg: baseColor,
+    portraitBg: adjustColorDark(baseColor, 0.35),
+    cardBg: '#1a100a',
+    cornerColor: '#c9a050',
+  };
+}
+
+/** 将颜色叠加深色（简单混合 — 不依赖外部库）*/
+function adjustColorDark(hex: string, darkenRatio: number): string {
+  try {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const dr = Math.round(r * (1 - darkenRatio));
+    const dg = Math.round(g * (1 - darkenRatio));
+    const db = Math.round(b * (1 - darkenRatio));
+    return `#${dr.toString(16).padStart(2, '0')}${dg.toString(16).padStart(2, '0')}${db.toString(16).padStart(2, '0')}`;
+  } catch {
+    return '#2a1a0a';
+  }
+}
+
+// ─── 四角 L 纹装饰组件 ────────────────────────────────────
+
+function CornerBrackets({ color }: { color: string }) {
+  const size = 14;
+  const thickness = 1.5;
+  const offset = 5;
+  const corners = [
+    { top: offset, left: offset, borderTop: thickness, borderLeft: thickness, borderRight: 0, borderBottom: 0 },
+    { top: offset, right: offset, borderTop: thickness, borderRight: thickness, borderLeft: 0, borderBottom: 0 },
+    { bottom: offset, left: offset, borderBottom: thickness, borderLeft: thickness, borderTop: 0, borderRight: 0 },
+    { bottom: offset, right: offset, borderBottom: thickness, borderRight: thickness, borderTop: 0, borderLeft: 0 },
+  ];
   return (
-    <Box
-      sx={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: 4,
-        overflow: 'hidden',
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '100%',
-          background: `repeating-linear-gradient(
-            -45deg,
-            transparent,
-            transparent 3px,
-            ${color}33 3px,
-            ${color}33 6px
-          )`,
-        },
-      }}
-    />
+    <>
+      {corners.map((c, i) => (
+        <Box
+          key={i}
+          sx={{
+            position: 'absolute',
+            width: size,
+            height: size,
+            top: c.top !== undefined ? c.top : undefined,
+            bottom: c.bottom !== undefined ? c.bottom : undefined,
+            left: c.left !== undefined ? c.left : undefined,
+            right: c.right !== undefined ? c.right : undefined,
+            borderTop: c.borderTop ? `${c.borderTop}px solid ${color}` : undefined,
+            borderBottom: c.borderBottom ? `${c.borderBottom}px solid ${color}` : undefined,
+            borderLeft: c.borderLeft ? `${c.borderLeft}px solid ${color}` : undefined,
+            borderRight: c.borderRight ? `${c.borderRight}px solid ${color}` : undefined,
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        />
+      ))}
+    </>
   );
 }
+
+// ─── 分割线（带菱形中心装饰）────────────────────────────────
+
+function GoldDivider({ color = '#c9a050' }: { color?: string }) {
+  return (
+    <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', my: 0.8 }}>
+      <Box sx={{ flex: 1, height: '1px', background: `${color}55` }} />
+      <Box sx={{
+        width: 5, height: 5,
+        transform: 'rotate(45deg)',
+        background: color,
+        mx: 0.8,
+        flexShrink: 0,
+        opacity: 0.8,
+      }} />
+      <Box sx={{ flex: 1, height: '1px', background: `${color}55` }} />
+    </Box>
+  );
+}
+
+// ─── Props ───────────────────────────────────────────────
 
 interface CharacterCardProps {
   character: Character;
@@ -74,15 +134,13 @@ interface CharacterCardProps {
   characterEvents?: HistoryEvent[];
   worldYearMin?: number;
   worldYearMax?: number;
-  /** 点击冲突/故事种子徽章时触发（传入人物ID） */
   onConflictClick?: (charId: string) => void;
-  /** 是否处于多选模式 */
   selectionMode?: boolean;
-  /** 是否已被选中 */
   selected?: boolean;
-  /** 选中状态变化回调 */
   onSelectionChange?: (characterId: string, selected: boolean) => void;
 }
+
+// ─── 主组件 ──────────────────────────────────────────────
 
 const CharacterCard = React.memo<CharacterCardProps>(({
   character,
@@ -104,11 +162,11 @@ const CharacterCard = React.memo<CharacterCardProps>(({
     s.data.factions.find((f) => f.id === character.factionId)
   );
   const factionColor = faction?.color ?? '#8B4513';
+  const theme = getFactionTheme(factionColor);
 
-  // Compute lifespan string
   const lifespan =
     character.birthYear !== undefined
-      ? `${character.birthYear}${character.deathYear !== undefined ? ` - ${character.deathYear}` : ' - 至今'}`
+      ? `${character.birthYear}${character.deathYear !== undefined ? ` — ${character.deathYear}` : ' — 至今'}`
       : undefined;
 
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -126,52 +184,55 @@ const CharacterCard = React.memo<CharacterCardProps>(({
   };
 
   return (
-    <Card
+    <Box
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={handleClick}
       sx={{
         position: 'relative',
-        maxWidth: 300,
         width: '100%',
-        borderLeft: `4px solid ${factionColor}`,
-        borderRadius: '0 12px 12px 0',
-        background: selected ? '#e8edf8' : '#fffef8',
+        borderRadius: '8px',
+        border: `2px solid`,
+        borderColor: selected ? '#f5d58a' : `${theme.borderColor}cc`,
+        background: theme.cardBg,
         cursor: 'pointer',
-        transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s',
-        transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+        animation: hovered
+          ? `${cardLift} 0.2s ease forwards, ${borderPulse} 2s ease-in-out 0.2s infinite`
+          : 'none',
+        transform: hovered ? 'translateY(-8px)' : 'translateY(0)',
+        transition: 'transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
         boxShadow: hovered
-          ? `0 8px 24px rgba(26,35,126,0.15), 0 0 0 1px ${factionColor}20`
-          : '0 2px 8px rgba(0,0,0,0.08)',
-        overflow: 'visible',
-        outline: selected ? '2px solid #1a237e' : 'none',
-        outlineOffset: -2,
-        // 叙事层：悬停时触发金色光晕
-        animation: hovered ? `${borderGlow} 2s ease-in-out infinite` : 'none',
+          ? `0 8px 32px rgba(0,0,0,0.6), 0 0 0 2px ${theme.cornerColor}60`
+          : `0 3px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)`,
+        outline: selected ? `2px solid #f5d58a` : 'none',
+        outlineOffset: 1,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        aspectRatio: '5/7',  // 三国杀卡牌比例
         '&::before': {
           content: '""',
           position: 'absolute',
-          top: 0,
-          right: 0,
-          width: 60,
-          height: 60,
-          background: `radial-gradient(circle at top right, ${factionColor}10 0%, transparent 70%)`,
+          inset: 0,
+          background: `repeating-linear-gradient(
+            -55deg,
+            transparent,
+            transparent 18px,
+            rgba(255,255,255,0.012) 18px,
+            rgba(255,255,255,0.012) 19px
+          )`,
           pointerEvents: 'none',
-          borderRadius: '0 12px 0 0',
+          zIndex: 0,
         },
       }}
     >
-      {/* 势力纹样装饰 — 左侧色带叠加斜纹 */}
-      <FactionPattern color={factionColor} />
-      {/* 多选 Checkbox - 左上角 */}
+      {/* 四角 L 纹装饰 */}
+      <CornerBrackets color={selected ? '#f5d58a' : theme.cornerColor} />
+
+      {/* 多选 Checkbox */}
       {selectionMode && (
         <Box
-          sx={{
-            position: 'absolute',
-            top: 4,
-            left: 8,
-            zIndex: 3,
-          }}
+          sx={{ position: 'absolute', top: 8, left: 8, zIndex: 4 }}
           onClick={(e) => e.stopPropagation()}
         >
           <Checkbox
@@ -179,24 +240,24 @@ const CharacterCard = React.memo<CharacterCardProps>(({
             onChange={handleCheckboxChange}
             size="small"
             sx={{
-              color: '#1a237e',
-              '&.Mui-checked': { color: '#1a237e' },
-              p: 0.5,
-              background: 'rgba(255,255,255,0.8)',
+              color: '#c9a050',
+              '&.Mui-checked': { color: '#f5d58a' },
+              p: 0.25,
+              background: 'rgba(20,10,5,0.75)',
               borderRadius: 1,
             }}
           />
         </Box>
       )}
 
-      {/* 导出按钮 - 右上角悬浮（非多选模式才显示） */}
+      {/* 导出按钮（非多选模式） */}
       {!selectionMode && (
         <Box
           sx={{
             position: 'absolute',
             top: 8,
             right: 8,
-            zIndex: 2,
+            zIndex: 4,
             opacity: hovered ? 1 : 0,
             transition: 'opacity 0.2s',
           }}
@@ -205,158 +266,301 @@ const CharacterCard = React.memo<CharacterCardProps>(({
         </Box>
       )}
 
-      {/* Header: Avatar + Name + Faction */}
-      <CardContent sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-          <Avatar
-            src={character.avatar}
-            sx={{
-              width: 64,
-              height: 64,
-              mr: 1.5,
-              border: `2px solid ${factionColor}`,
-              fontSize: '1.5rem',
-              boxShadow: hovered
-                ? `0 0 12px ${factionColor}40, 0 2px 8px rgba(0,0,0,0.1)`
-                : 'none',
-              transition: 'box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          >
-            {character.name.charAt(0)}
-          </Avatar>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+      <CardContent sx={{ p: 0, position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', '&:last-child': { pb: 0 } }}>
+
+        {/* Z1-Z2: 称号 + 姓名栏 */}
+        <Box
+          sx={{
+            background: `linear-gradient(135deg, ${adjustColorDark(factionColor, 0.15)} 0%, ${adjustColorDark(factionColor, 0.4)} 100%)`,
+            borderBottom: `1px solid ${theme.cornerColor}60`,
+            px: 1.5,
+            py: 0.7,
+            textAlign: 'center',
+          }}
+        >
+          {character.nickname && (
             <Typography
-              variant="h6"
               sx={{
-                fontFamily: "'LXGW WenKai TC', serif",
-                fontWeight: 700,
-                color: '#1a237e',
-                fontSize: '1.1rem',
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                fontFamily: "'LXGW WenKai TC', 'Noto Serif SC', serif",
+                color: `${theme.cornerColor}cc`,
+                fontSize: '0.7rem',
+                letterSpacing: '0.1em',
+                mb: 0.2,
+                display: 'block',
               }}
             >
-              {character.name}
+              「{character.nickname}」
             </Typography>
-            {character.title && (
-              <Typography
-                variant="caption"
-                sx={{ color: '#666', display: 'block', fontStyle: 'italic' }}
-              >
-                {character.title}
-              </Typography>
-            )}
-            {faction && (
-              <Chip
-                label={faction.name}
-                size="small"
-                sx={{
-                  mt: 0.5,
-                  fontSize: '0.7rem',
-                  backgroundColor: faction.color,
-                  color: '#fff',
-                  fontWeight: 600,
-                  '& .MuiChip-label': { px: 1 },
-                }}
-              />
-            )}
-            {lifespan && (
-              <Typography variant="caption" sx={{ color: '#999', ml: 1 }}>
-                {lifespan}
-              </Typography>
-            )}
-            {/* Conflict badge - 故事种子风格 */}
-            {conflicts.length > 0 && (
-              <Box sx={{ ml: 'auto', pl: 1 }}>
-                <ConflictBadge
-                  conflicts={conflicts}
-                  size="small"
-                  onClick={(e) => {
-                    e?.stopPropagation();
-                    onConflictClick?.(character.id);
-                  }}
-                />
-              </Box>
-            )}
+          )}
+          <Typography
+            sx={{
+              fontFamily: "'LXGW WenKai TC', 'Noto Serif SC', serif",
+              fontWeight: 700,
+              color: '#f5e6c0',
+              fontSize: '1.3rem',
+              lineHeight: 1.2,
+              letterSpacing: '0.08em',
+              textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+            }}
+          >
+            {character.name}
+          </Typography>
+          {character.title && (
+            <Typography
+              sx={{
+                color: `${theme.cornerColor}99`,
+                fontSize: '0.65rem',
+                fontFamily: "'LXGW WenKai TC', serif",
+                mt: 0.2,
+                display: 'block',
+              }}
+            >
+              {character.title}
+            </Typography>
+          )}
+        </Box>
+
+        {/* Z3-Z5: 插画区（大尺寸） */}
+        <Box
+          sx={{
+            background: theme.portraitBg,
+            flex: '0 0 auto',
+            height: 160,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            borderBottom: `1px solid ${theme.cornerColor}40`,
+            overflow: 'hidden',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              inset: 0,
+              background: `radial-gradient(ellipse at center, transparent 30%, ${theme.cardBg}cc 100%)`,
+              pointerEvents: 'none',
+            },
+          }}
+        >
+          {character.portrait ? (
+            <img
+              src={character.portrait}
+              alt={character.name}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+          ) : (
+            <Avatar
+              src={character.avatar}
+              sx={{
+                width: 100,
+                height: 100,
+                border: `2px solid ${theme.cornerColor}80`,
+                borderRadius: '4px',
+                fontSize: '2.5rem',
+                background: adjustColorDark(factionColor, 0.5),
+                color: '#f5e6c0',
+                fontFamily: "'LXGWenKai TC', serif",
+                zIndex: 1,
+                boxShadow: `0 4px 16px rgba(0,0,0,0.6)`,
+              }}
+            >
+              {character.name.charAt(0)}
+            </Avatar>
+          )}
+
+          {/* 卡牌编号 */}
+          {character.cardNumber && (
+            <Typography
+              sx={{
+                position: 'absolute',
+                top: 8,
+                left: 8,
+                fontSize: '0.6rem',
+                color: `${theme.cornerColor}99`,
+                fontFamily: "'LXGWenKai TC', serif",
+                zIndex: 2,
+                background: 'rgba(0,0,0,0.5)',
+                px: 0.5,
+                py: 0.2,
+                borderRadius: '2px',
+              }}
+            >
+              {character.cardNumber}
+            </Typography>
+          )}
+
+          {/* 稀有度标志 */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              px: 0.8,
+              py: 0.2,
+              borderRadius: '2px',
+              background: (RARITY_COLORS[character.rarity ?? 'common']).bg,
+              border: `1px solid ${(RARITY_COLORS[character.rarity ?? 'common']).border}`,
+              zIndex: 2,
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '0.6rem',
+                color: (RARITY_COLORS[character.rarity ?? 'common']).text,
+                fontFamily: "'LXGWenKai TC', serif",
+                letterSpacing: '0.05em',
+              }}
+            >
+              {character.rarity === 'common' ? '普通' :
+               character.rarity === 'rare' ? '稀有' :
+               character.rarity === 'epic' ? '史诗' : '传说'}
+            </Typography>
           </Box>
         </Box>
 
-        {/* Skills section */}
-        {character.skills.length > 0 && (
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ color: '#888', fontWeight: 600, display: 'block', mb: 0.5 }}>
-              技能
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap' }}>
-              {character.skills.map((skill, idx) => (
-                <SkillChip key={idx} skill={skill} size="small" />
-              ))}
-            </Box>
-          </Box>
-        )}
+        {/* Z6: 勾玉体力 */}
+        <Box
+          sx={{
+            px: 1.5,
+            py: 0.6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: `1px solid ${theme.cornerColor}25`,
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: '0.65rem',
+              color: `${theme.cornerColor}aa`,
+              fontFamily: "'LXGWenKai TC', serif",
+              mr: 1,
+              flexShrink: 0,
+            }}
+          >
+            体力
+          </Typography>
+          <JadeTokens count={character.hp ?? 4} size={22} />
+        </Box>
 
-        {/* Traits chips */}
-        {character.traits.length > 0 && (
-          <Box sx={{ mb: 1 }}>
-            <Typography variant="caption" sx={{ color: '#888', fontWeight: 600, display: 'block', mb: 0.3 }}>
-              特质
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {/* Z7-Z10: 技能完整描述区 */}
+        <Box sx={{ px: 1.5, pt: 1, pb: 1, flex: 1, overflow: 'auto', minHeight: 0 }}>
+          {character.skills.map((skill, idx) => (
+            <Box
+              key={idx}
+              sx={{
+                mb: 1,
+                p: 1,
+                border: `1px solid ${theme.cornerColor}35`,
+                borderRadius: '4px',
+                background: 'rgba(201,160,80,0.06)',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.4 }}>
+                <Typography
+                  sx={{
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    color: '#f5e6c0',
+                    fontFamily: "'LXGWenKai TC', serif",
+                  }}
+                >
+                  {skill.name}
+                </Typography>
+                <Chip
+                  label={skill.type === 'active' ? '主动' : skill.type === 'passive' ? '被动' : '特殊'}
+                  size="small"
+                  sx={{
+                    height: 18,
+                    fontSize: '0.58rem',
+                    background: `${factionColor}40`,
+                    color: factionColor,
+                    '& .MuiChip-label': { px: 0.5 },
+                  }}
+                />
+              </Box>
+              {skill.description && (
+                <Typography
+                  sx={{
+                    fontSize: '0.72rem',
+                    color: '#c9a050',
+                    lineHeight: 1.6,
+                    fontFamily: "'LXGWenKai TC', serif",
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  {skill.description}
+                </Typography>
+              )}
+            </Box>
+          ))}
+
+          {/* 特质标签 */}
+          {character.traits.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.4, mt: 0.5 }}>
               {character.traits.map((trait) => (
                 <Chip
                   key={trait}
                   label={trait}
                   size="small"
-                  variant="filled"
                   sx={{
-                    fontSize: '0.7rem',
-                    background: '#f5f0e6',
-                    color: '#554433',
-                    height: 22,
+                    fontSize: '0.63rem',
+                    background: 'rgba(201,160,80,0.12)',
+                    color: '#d4a84a',
+                    border: `0.5px solid ${theme.cornerColor}60`,
+                    borderRadius: '3px',
+                    height: 20,
+                    fontFamily: "'LXGWenKai TC', serif",
+                    '& .MuiChip-label': { px: 0.8 },
                   }}
                 />
               ))}
             </Box>
-          </Box>
-        )}
+          )}
+        </Box>
 
-        {/* Bio summary (2-line ellipsis) */}
-        {character.bio && (
-          <Tooltip title={character.bio} placement="top" arrow>
+        {/* Z11-Z12: 底部信息栏 */}
+        <Box
+          sx={{
+            px: 1.5,
+            py: 0.6,
+            borderTop: `1px solid ${theme.cornerColor}30`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'rgba(0,0,0,0.3)',
+          }}
+        >
+          {lifespan && (
             <Typography
-              variant="body2"
               sx={{
-                color: '#555',
-                fontSize: '0.8rem',
-                lineHeight: 1.6,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                borderTop: '1px dashed rgba(139,69,19,0.2)',
-                pt: 1,
+                fontSize: '0.6rem',
+                color: `${theme.cornerColor}99`,
+                fontFamily: "'LXGWenKai TC', serif",
+                letterSpacing: '0.04em',
               }}
             >
-              {character.bio}
+              {lifespan}
             </Typography>
-          </Tooltip>
-        )}
-
-        {/* 生命周期时间条 */}
-        {(character.birthYear !== undefined || characterEvents.length > 0) && (
-          <LifecycleBar
-            character={character}
-            characterEvents={characterEvents}
-            worldYearMin={worldYearMin}
-            worldYearMax={worldYearMax}
-            factionColor={factionColor}
-          />
-        )}
+          )}
+          {faction && (
+            <Typography
+              sx={{
+                fontSize: '0.6rem',
+                color: factionColor,
+                fontFamily: "'LXGWenKai TC', serif",
+                letterSpacing: '0.05em',
+              }}
+            >
+              {faction.name}
+            </Typography>
+          )}
+        </Box>
       </CardContent>
-    </Card>
+    </Box>
   );
 });
 

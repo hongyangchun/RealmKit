@@ -1,24 +1,47 @@
 /**
- * SkillChip - 技能标签 Chip
- * 显示技能名称、类型图标
+ * SkillChip - 技能标签（三国杀印章风格）
+ * 主动/被动/特殊 三色系 · 深底描边徽章
  */
 import React from 'react';
-import { Chip, Tooltip } from '@mui/material';
+import { Box, Tooltip } from '@mui/material';
 import BoltIcon from '@mui/icons-material/Bolt';
 import ShieldIcon from '@mui/icons-material/Shield';
 import StarIcon from '@mui/icons-material/Star';
 import type { Skill } from '../../types';
 
-const TYPE_ICONS: Record<Skill['type'], React.ReactElement> = {
-  active: <BoltIcon sx={{ fontSize: 14 }} />,
-  passive: <ShieldIcon sx={{ fontSize: 14 }} />,
-  special: <StarIcon sx={{ fontSize: 14 }} />,
-};
-
-const TYPE_LABELS: Record<Skill['type'], string> = {
-  active: '主动',
-  passive: '被动',
-  special: '特殊',
+// 三色体系：主动(赤) / 被动(青) / 特殊(紫)
+const TYPE_CONFIG: Record<Skill['type'], {
+  icon: React.ReactElement;
+  label: string;
+  border: string;
+  bg: string;
+  color: string;
+  iconColor: string;
+}> = {
+  active: {
+    icon: <BoltIcon sx={{ fontSize: 11 }} />,
+    label: '主动',
+    border: '#c0392b',
+    bg: 'rgba(192,57,43,0.15)',
+    color: '#e07060',
+    iconColor: '#e05040',
+  },
+  passive: {
+    icon: <ShieldIcon sx={{ fontSize: 11 }} />,
+    label: '被动',
+    border: '#1a6a8a',
+    bg: 'rgba(26,106,138,0.15)',
+    color: '#5aaad0',
+    iconColor: '#4090b8',
+  },
+  special: {
+    icon: <StarIcon sx={{ fontSize: 11 }} />,
+    label: '特殊',
+    border: '#6a3a8a',
+    bg: 'rgba(106,58,138,0.15)',
+    color: '#b080d8',
+    iconColor: '#9060b8',
+  },
 };
 
 interface SkillChipProps {
@@ -26,40 +49,57 @@ interface SkillChipProps {
   size?: 'small' | 'medium';
 }
 
-const SkillChip: React.FC<SkillChipProps> = ({ skill, size = 'small' }) => {
+const SkillChip: React.FC<SkillChipProps> = ({ skill }) => {
+  const cfg = TYPE_CONFIG[skill.type];
   return (
-    <Tooltip title={skill.description} arrow placement="top">
-      <Chip
-        icon={TYPE_ICONS[skill.type]}
-        label={
-          <span>
-            <b>{skill.name}</b>
-            <span style={{ opacity: 0.6, marginLeft: 4, fontSize: '0.75em' }}>
-              [{TYPE_LABELS[skill.type]}]
-            </span>
-          </span>
-        }
-        size={size}
-        variant="outlined"
+    <Tooltip title={skill.description || ''} arrow placement="top">
+      <Box
         sx={{
-          borderColor: skill.type === 'active'
-            ? '#f39c12'
-            : skill.type === 'passive'
-              ? '#3498db'
-              : '#9b59b6',
-          color: skill.type === 'active' ? '#e67e22' : undefined,
-          mr: 0.5,
-          mb: 0.5,
-          '& .MuiChip-icon': {
-            color:
-              skill.type === 'active'
-                ? '#f39c12'
-                : skill.type === 'passive'
-                  ? '#3498db'
-                  : '#9b59b6',
-          },
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '3px',
+          px: '6px',
+          py: '2px',
+          mr: '4px',
+          mb: '4px',
+          borderRadius: '3px',
+          border: `0.5px solid ${cfg.border}`,
+          background: cfg.bg,
+          cursor: 'default',
+          userSelect: 'none',
         }}
-      />
+      >
+        {/* 类型图标 */}
+        <Box sx={{ color: cfg.iconColor, display: 'flex', alignItems: 'center', lineHeight: 1 }}>
+          {cfg.icon}
+        </Box>
+        {/* 技能名 */}
+        <Box
+          component="span"
+          sx={{
+            fontSize: '0.68rem',
+            fontWeight: 500,
+            color: cfg.color,
+            fontFamily: "'LXGW WenKai TC', serif",
+            letterSpacing: '0.04em',
+            lineHeight: 1.4,
+          }}
+        >
+          {skill.name}
+        </Box>
+        {/* 类型标注 */}
+        <Box
+          component="span"
+          sx={{
+            fontSize: '0.56rem',
+            color: `${cfg.color}88`,
+            fontFamily: "'LXGW WenKai TC', serif",
+            lineHeight: 1.4,
+          }}
+        >
+          [{cfg.label}]
+        </Box>
+      </Box>
     </Tooltip>
   );
 };

@@ -16,6 +16,7 @@ import type {
   ConflictWarning,
   MapLayer,
   MapGrid,
+  CardPack,
   GridCell,
   LayerId,
   DrawingTool,
@@ -61,6 +62,7 @@ const DEFAULT_WORLD_DATA: WorldData = {
   events: [],
   mapPins: [],
   cities: [],
+  cardPacks: [],
   mapImage: undefined,
   eras: [],
   mapGrid: DEFAULT_GRID,
@@ -114,6 +116,13 @@ interface WorldStore {
   addCity: (c: Omit<City, 'id'>) => void;
   updateCity: (id: string, patch: Partial<City>) => void;
   deleteCity: (id: string) => void;
+
+  // ── Card Packs ──────────────────────────────────────────────────────────
+  addCardPack: (name: string, description: string) => void;
+  updateCardPack: (id: string, patch: Partial<Pick<CardPack, 'name' | 'description'>>) => void;
+  deleteCardPack: (id: string) => void;
+  addCharacterToPack: (packId: string, characterId: string) => void;
+  removeCharacterFromPack: (packId: string, characterId: string) => void;
 
   // ── Map Image ─────────────────────────────────────────────────────────────
   setMapImage: (base64: string | undefined) => void;
@@ -236,6 +245,7 @@ export const useWorldStore = create<WorldStore>((set, get) => {
   initialData.events = initialData.events ?? [];
   initialData.mapPins = initialData.mapPins ?? [];
   initialData.cities = initialData.cities ?? [];
+  initialData.cardPacks = initialData.cardPacks ?? [];
   initialData.eras = initialData.eras ?? [];
   // Migrate old cell key format "x,y" → "layerId:x,y"
   initialData = migrateCellKeys(initialData);
@@ -512,6 +522,77 @@ export const useWorldStore = create<WorldStore>((set, get) => {
           ...s.data,
           cities: s.data.cities.filter((c) => c.id !== id),
           mapGrid: newGrid,
+        };
+        const conflicts = persist(data);
+        return { data, conflicts, isDirty: false };
+      }),
+
+    // ── Card Packs ────────────────────────────────────────────────────────
+    addCardPack: (name, description) =>
+      set((s) => {
+        const now = new Date().toISOString();
+        const newPack: CardPack = {
+          id: uuid(),
+          name,
+          description,
+          characterIds: [],
+          createdAt: now,
+          updatedAt: now,
+        };
+        const data: WorldData = {
+          ...s.data,
+          cardPacks: [...s.data.cardPacks, newPack],
+        };
+        const conflicts = persist(data);
+        return { data, conflicts, isDirty: false };
+      }),
+
+    updateCardPack: (id, patch) =>
+      set((s) => {
+        const data: WorldData = {
+          ...s.data,
+          cardPacks: s.data.cardPacks.map((p) =>
+            p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p
+          ),
+        };
+        const conflicts = persist(data);
+        return { data, conflicts, isDirty: false };
+      }),
+
+    deleteCardPack: (id) =>
+      set((s) => {
+        // 仅删除卡片包，不级联删除人物
+        const data: WorldData = {
+          ...s.data,
+          cardPacks: s.data.cardPacks.filter((p) => p.id !== id),
+        };
+        const conflicts = persist(data);
+        return { data, conflicts, isDirty: false };
+      }),
+
+    addCharacterToPack: (packId, characterId) =>
+      set((s) => {
+        const data: WorldData = {
+          ...s.data,
+          cardPacks: s.data.cardPacks.map((p) =>
+            p.id === packId && !p.characterIds.includes(characterId)
+              ? { ...p, characterIds: [...p.characterIds, characterId], updatedAt: new Date().toISOString() }
+              : p
+          ),
+        };
+        const conflicts = persist(data);
+        return { data, conflicts, isDirty: false };
+      }),
+
+    removeCharacterFromPack: (packId, characterId) =>
+      set((s) => {
+        const data: WorldData = {
+          ...s.data,
+          cardPacks: s.data.cardPacks.map((p) =>
+            p.id === packId
+              ? { ...p, characterIds: p.characterIds.filter((cid) => cid !== characterId), updatedAt: new Date().toISOString() }
+              : p
+          ),
         };
         const conflicts = persist(data);
         return { data, conflicts, isDirty: false };
@@ -994,6 +1075,7 @@ export const useWorldStore = create<WorldStore>((set, get) => {
             { id: 'pin', name: '图钉层', visible: true, opacity: 1, isReadOnly: true },
           ],
           eras: [],
+          cardPacks: [],
         };
 
         const conflicts = persist(newData);

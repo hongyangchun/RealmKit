@@ -31,7 +31,9 @@ import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import CloseIcon from '@mui/icons-material/Close';
 import HubIcon from '@mui/icons-material/Hub';
 import GridViewIcon from '@mui/icons-material/GridView';
+import StyleIcon from '@mui/icons-material/Style';
 import SearchIcon from '@mui/icons-material/Search';
+import PrintIcon from '@mui/icons-material/Print';
 import InputAdornment from '@mui/material/InputAdornment';
 import { useWorldStore } from '../store/worldStore';
 import RelationGraph from '../components/graph/RelationGraph';
@@ -42,11 +44,13 @@ import { exportCharacterCard } from '../components/character/CharacterCardExport
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import EmptyState from '../components/common/EmptyState';
 import StorySeedDialog from '../components/common/StorySeedDialog';
+import PrintPreviewDialog from '../components/character/PrintPreviewDialog';
+import CardPackPanel from '../components/character/CardPackPanel';
 import { storySeedService } from '../services/storySeedService';
 import type { Character } from '../types';
 import type { StorySeedData } from '../services/storySeedService';
 
-type ViewMode = 'graph' | 'cards';
+type ViewMode = 'graph' | 'cards' | 'packs';
 
 const CharacterPage: React.FC = () => {
   const theme = useTheme();
@@ -63,6 +67,17 @@ const CharacterPage: React.FC = () => {
 
   // ── 视图模式 ──
   const [viewMode, setViewMode] = useState<ViewMode>('graph');
+  const cardPackCount = useWorldStore((s) => s.data.cardPacks.length);
+
+  const handleViewModeChange = useCallback(
+    (_: unknown, val: ViewMode) => {
+      if (!val) return;
+      setViewMode(val);
+      // 切换到卡片包时清除人物选中态，详情面板不适用
+      if (val === 'packs') setSelectedCharId(null);
+    },
+    [],
+  );
 
   // ── 选中人物 ──
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
@@ -88,6 +103,9 @@ const CharacterPage: React.FC = () => {
   const [batchToast, setBatchToast] = useState<{ open: boolean; msg: string; ok: boolean }>({
     open: false, msg: '', ok: true,
   });
+
+  // ── 打印预览 ──
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
 
   // ── 故事种子 ──
   const [storySeedDialogOpen, setStorySeedDialogOpen] = useState(false);
@@ -228,6 +246,15 @@ const CharacterPage: React.FC = () => {
     return m;
   }, [events]);
 
+  // 打印数据：当前过滤后的人物 + 势力
+  const printData = useMemo(() =>
+    filteredCharacters.map((c) => ({
+      character: c,
+      faction: factions.find((f) => f.id === c.factionId),
+    })),
+    [filteredCharacters, factions],
+  );
+
   // ── Detail panel content (shared between desktop sidebar and mobile drawer) ──
   const detailPanel = (
     <CharacterDetailPanel
@@ -235,6 +262,7 @@ const CharacterPage: React.FC = () => {
       onClose={() => setSelectedCharId(null)}
       onEdit={handleEdit}
       onDelete={(c) => setDeleteTarget(c)}
+      isEditing={!!editingChar}
     />
   );
 
@@ -257,7 +285,7 @@ const CharacterPage: React.FC = () => {
         <ToggleButtonGroup
           value={viewMode}
           exclusive
-          onChange={(_, val) => val && setViewMode(val)}
+          onChange={handleViewModeChange}
           size="small"
           sx={{
             '& .MuiToggleButton-root': {
@@ -281,9 +309,13 @@ const CharacterPage: React.FC = () => {
           <ToggleButton value="cards">
             <GridViewIcon sx={{ fontSize: 16, mr: 0.5 }} /> 卡片
           </ToggleButton>
+          <ToggleButton value="packs">
+            <StyleIcon sx={{ fontSize: 16, mr: 0.5 }} /> 卡片包
+          </ToggleButton>
         </ToggleButtonGroup>
 
-        {/* Search */}
+        {/* Search (not in packs mode) */}
+        {viewMode !== 'packs' && (
         <TextField
           size="small"
           placeholder="搜索人物…"
@@ -307,6 +339,7 @@ const CharacterPage: React.FC = () => {
             },
           }}
         />
+        )}
 
         {/* Faction filter (cards mode only, graph has its own controls) */}
         {viewMode === 'cards' && (
@@ -353,12 +386,36 @@ const CharacterPage: React.FC = () => {
           </>
         )}
 
-        {/* Character count */}
+        {/* Count */}
         <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-          {viewMode === 'graph' ? graphVisibleCount : filteredCharacters.length} 位人物
+          {viewMode === 'packs'
+            ? `${cardPackCount} 个卡片包`
+            : viewMode === 'graph'
+              ? `${graphVisibleCount} 位人物`
+              : `${filteredCharacters.length} 位人物`}
         </Typography>
 
-        {/* New character button */}
+        {/* Print button (cards mode only) */}
+        {viewMode === 'cards' && (
+          <Button
+            startIcon={<PrintIcon />}
+            variant="outlined"
+            size="small"
+            onClick={() => setShowPrintPreview(true)}
+            disabled={filteredCharacters.length === 0}
+            sx={{
+              borderColor: '#1a237e',
+              color: '#1a237e',
+              textTransform: 'none',
+              '&.Mui-disabled': { borderColor: '#ccc', color: '#aaa' },
+            }}
+          >
+            打印卡片
+          </Button>
+        )}
+
+        {/* New character button (not in packs mode) */}
+        {viewMode !== 'packs' && (
         <Button
           startIcon={<AddIcon />}
           variant="contained"
@@ -371,6 +428,7 @@ const CharacterPage: React.FC = () => {
         >
           新建人物
         </Button>
+        )}
       </Box>
 
       {/* ── Multi-select toolbar (cards mode) ── */}
@@ -436,6 +494,8 @@ const CharacterPage: React.FC = () => {
               searchText={searchText}
               onVisibleCountChange={setGraphVisibleCount}
             />
+          ) : viewMode === 'packs' ? (
+            <CardPackPanel />
           ) : filteredCharacters.length > 0 ? (
             <Box sx={{ p: 2, overflow: 'auto', height: '100%' }}>
               <Grid container spacing={2}>
@@ -478,8 +538,8 @@ const CharacterPage: React.FC = () => {
           )}
         </Box>
 
-        {/* Detail Panel - Desktop sidebar */}
-        {!isMobile && (
+        {/* Detail Panel - Desktop sidebar (not in packs mode) */}
+        {!isMobile && viewMode !== 'packs' && (
           <Box
             sx={{
               width: selectedCharId ? 380 : 0,
@@ -494,8 +554,8 @@ const CharacterPage: React.FC = () => {
         )}
       </Box>
 
-      {/* Detail Panel - Mobile drawer */}
-      {isMobile && (
+      {/* Detail Panel - Mobile drawer (not in packs mode) */}
+      {isMobile && viewMode !== 'packs' && (
         <Drawer
           anchor="bottom"
           open={!!selectedCharId}
@@ -511,6 +571,13 @@ const CharacterPage: React.FC = () => {
           {detailPanel}
         </Drawer>
       )}
+
+      {/* ── Print Preview Dialog ── */}
+      <PrintPreviewDialog
+        open={showPrintPreview}
+        onClose={() => setShowPrintPreview(false)}
+        characters={printData}
+      />
 
       {/* ── Form dialog ── */}
       <Dialog
