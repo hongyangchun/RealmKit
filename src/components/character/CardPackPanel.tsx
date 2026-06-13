@@ -176,7 +176,7 @@ const CardPackPanel: React.FC = () => {
           icon={<StyleIcon sx={{ fontSize: 64, color: '#c9a050' }} />}
           title="尚无卡片包"
           description="创建一个卡片包来收纳你的英灵卡片——删除卡片包不会影响任何人物。"
-          action={
+          onAction={
             <Button
               variant="outlined"
               startIcon={<AddIcon />}
